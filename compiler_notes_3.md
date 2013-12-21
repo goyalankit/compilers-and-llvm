@@ -26,4 +26,12 @@ Predictions:
 
 There is **no** *universally accepted* metric for language design.
 
-1. 
+* A good language is one people use?
+  * Measures the popularity of language.
+  * Conclusion: Visual Basic is the best language! But not quite true.
+
+---
+####Conclusion####
+
+* Application domains have conflicting needs. Difficult to design one system to get all features.
+* Programmer training is the dominant cost for a programming language.

@@ -37,6 +37,30 @@ Programming languages define strict rules to prevent such ambiguities. Analogy:
 
 ```
 
+* **Optimization** is a little like editing.
 
+Automatically modify program so that they:
+  * Run Faster
+  * Use less memory
+  * less power use
+  * number of network messages
+  * number of database calls
+  
+`X = Y * 0 is the same as X = 0` => **INCORRECT RULE**
+
+Above rule is valid only for integers. Invalid for floating points.
+because of the rule `NAN * 0 = NAN`
+
+* **Code Generation**
+
+Translation to another language. High level code -> Assembly Code.
+
+---
+
+Proportions of each phase hass changed over time.
+
+Then: `[....L....] [....P.....] [.S.] [....O....] [....CG....]`
+
+Now: `[.L.][.P.][...S...][......O.......][.CG.]`
 
 

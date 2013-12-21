@@ -11,7 +11,6 @@ Applications domains have distinctive/conflicting needs.
 * Bussiness Applications: `persistence, report generation, data anlysis` -> SQL
 * Systems Programming: `low level control of resources, real time contraints` -> C/C++
 
-
 **Q. Why are there new programming languages?**
 
 Claim: Programmer training is the dominant cost for a programming language. [Time]
@@ -25,4 +24,6 @@ Predictions:
 
 **Q. What is a good programming languages?**
 
+There is **no** *universally accepted* metric for language design.
 
+1. 

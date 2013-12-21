@@ -9,3 +9,6 @@ Structure of a Compiler
 ---
 
 **First Step**: Recognize words
+
+* **Lexical Analysis** : *divides program text into "words" or "tokens".*
+

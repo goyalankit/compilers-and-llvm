@@ -12,3 +12,12 @@ Structure of a Compiler
 
 * **Lexical Analysis** : *divides program text into "words" or "tokens".*
 
+`if x==y then z=1; else z=2` contains *Keywords, operators, variable names, tokens*
+
+
+
+
+
+
+
+

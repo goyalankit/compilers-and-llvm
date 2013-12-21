@@ -6,5 +6,6 @@ Structure of a Compiler
 4. **Optimization**
 5. **Code Generation**
 
+---
 
 **First Step**: Recognize words

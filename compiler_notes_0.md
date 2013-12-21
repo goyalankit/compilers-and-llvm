@@ -10,8 +10,8 @@ Modern compilers still preserve the outline of Fortran.
 
 Structure of Fortran:
 
-1 Lexical Analysis
-2 Parsing
-3 Semantic Analysis
-4 Optimization
-5 Code Generation
+1. Lexical Analysis
+2. Parsing
+3. Semantic Analysis
+4. Optimization
+5. Code Generation

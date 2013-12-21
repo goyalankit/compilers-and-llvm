@@ -61,6 +61,6 @@ Proportions of each phase hass changed over time.
 
 Then: `[....L....] [....P.....] [.S.] [....O....] [....CG....]`
 
-Now: `[.L.][.P.][...S...][......O.......][.CG.]`
+Now: `[.L.][.P.][.......S......][...........O............][.CG.]`
 
 

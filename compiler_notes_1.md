@@ -1,3 +1,5 @@
+####Lecture 2####
+
 Structure of a Compiler
 
 1. **Lexical Analysis**

@@ -1,4 +1,4 @@
-#####Lecture 1#####
+####Lecture 1####
 
 `Compiler`: Pre-processes the code -> executable + data -> run
 

@@ -4,6 +4,6 @@
 
 `Interpreter`: data + code -> run
 
-**Fortran** => *Formula Translation*
+**Fortran** => *Formula Translation* -> First high level successful language
 
 

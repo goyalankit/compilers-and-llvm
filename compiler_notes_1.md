@@ -14,9 +14,10 @@ Structure of a Compiler
 
 `if x==y then z=1; else z=2` contains *Keywords, operators, variable names, tokens*
 
+Parsing: 
 
 
-
+![C++ Var Types](https://gist.github.com/goyalankit/8074196/raw/85664326f4931a96082d62b55b95bc306bafc044/compilers1.png)
 
 
 

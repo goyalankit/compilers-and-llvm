@@ -27,9 +27,11 @@ Use regular expressions to define regular languages.
   
 **Definition:** The Regular Expressions over &sum; are the smallest set of expressions including
 
+Known as grammar.
+
 ```
   R = E
-    | 'c'
+    | 'c' where c E &sum;
     | 'R + R'
     | RR
     | R*

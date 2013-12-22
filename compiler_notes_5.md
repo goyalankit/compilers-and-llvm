@@ -2,7 +2,7 @@
 
 * Partition the input string into **lexemes**
 * Identify the token of each lexeme.
-* Left to Right scan. Lookahead required sometimes. Languages try to minimize the amount of lookahead required. 
+* Left to Right scan => Lookahead required sometimes. Languages try to minimize the amount of lookahead required. 
 
 Example:
 

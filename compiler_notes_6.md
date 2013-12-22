@@ -8,6 +8,6 @@ Use regular expressions to define Regular Languages.
 
 * Epsilon
 
-  ` &Epsilon; = { "" }`
+   &Epsilon; = { "" }
   
   

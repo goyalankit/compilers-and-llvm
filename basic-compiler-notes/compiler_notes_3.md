@@ -35,3 +35,6 @@ There is **no** *universally accepted* metric for language design.
 
 * Application domains have conflicting needs. Difficult to design one system to get all features.
 * Programmer training is the dominant cost for a programming language.
+
+
+<table><tr><td><a href="compiler_notes_1.md" >&larr; Previous</a></td><td><a href="compiler_notes_4.md" >Next &rarr;</a></td></tr></table>

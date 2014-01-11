@@ -13,3 +13,5 @@ C++ Stream Syntax: `cin >> var;`
 Nested Templates: `Foo< Bar<Bazz>>` -> here compiler gets confused with `>>`.
 
 Solution: Insert a blank. `> >`
+
+<table><tr><td><a href="compiler_notes_4.md" >&larr; Previous</a></td><td><a href="compiler_notes_6.md" >Next &rarr;</a></td></tr></table>

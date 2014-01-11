@@ -15,4 +15,6 @@
 * Five Constructs: 
   * Two base cases: `empty and 1-character strings`
   * Three compound expressions: union, concatenation, iteration.
-* 
+
+
+<table><tr><td><a href="compiler_notes_6.md" >&larr; Previous</a></td><td>Next &rarr;</td></tr></table>

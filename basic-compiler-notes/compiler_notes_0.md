@@ -15,3 +15,5 @@ Modern compilers still preserve the outline of Fortran.
 3. **Semantic Analysis** - *Typescope*
 4. **Optimization**
 5. **Code Generation** - *Translation*
+
+<table><tr><td>&larr; Previous</td><td><a href="compiler_notes_1.md" >Next &rarr;</a></td></tr></table>

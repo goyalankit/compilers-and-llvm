@@ -15,3 +15,6 @@ class Main {
 
 
 ```
+
+
+<table><tr><td><a href="compiler_notes_3.md" >&larr; Previous</a></td><td><a href="compiler_notes_5.md" >Next &rarr;</a></td></tr></table>

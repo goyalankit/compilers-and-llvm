@@ -55,7 +55,6 @@ A[:] = B[:] + C[:];
 
 ```c++
 __declspec(vector) //This turn foo into a vectorized function
-
 float foo(float B, float C){
 	return B + C;
 }
@@ -67,3 +66,5 @@ for(int i=0; i<N; i++){
 }
 
 ```
+
+<table><tr><td><a href="vectorization_0.md" >&larr; Previous</a></td><td><a href="vectorization_2.md" >Next &rarr;</a></td></tr></table>

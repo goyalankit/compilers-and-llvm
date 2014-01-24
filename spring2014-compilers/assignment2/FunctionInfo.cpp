@@ -33,7 +33,8 @@ namespace {
 
         public:
             static char ID;
-            FunctionInfo() : ModulePass(ID) {} //default constructor
+            FunctionInfo() : ModulePass(ID) { errs() << "\n"; } //default constructor
+            ~FunctionInfo() { errs() << "\n";  }
 
             virtual bool runOnFunction(Function &F) {
                 int arg_size = F.arg_size();
@@ -44,7 +45,7 @@ namespace {
                 for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I)
                     number_of_instructions += 1;
 
-                errs() << F.getName() <<": arguments=" << arg_size << " call sites=" <<  num_call_sites << " basic blocks=" << num_basic_blocks << " instructions=" << number_of_instructions << "\n";
+                errs() << F.getName() <<": arguments=" << arg_size << " call sites=" <<  num_call_sites << " basic blocks=" << num_basic_blocks << " instructions=" << number_of_instructions << "\n\n";
                 return false;
             }
 

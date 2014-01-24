@@ -33,18 +33,22 @@ namespace {
 
         public:
             static char ID;
-            FunctionInfo() : ModulePass(ID) {} //defailt constructor
+            FunctionInfo() : ModulePass(ID) {} //default constructor
 
             void printInfo(std::string into, formatted_raw_ostream &OS) {
 
             }	
 
-
             virtual bool runOnFunction(Function &F) {
+                errs() << F.getName() << "\n";
                 return false;
             }
 
             virtual bool runOnModule(Module &M){
+                for (Module::iterator MI = M.begin(), ME = M.end(); MI != ME; ++MI)
+                {
+                    runOnFunction(*MI);
+                }
                 return false;
             }
 

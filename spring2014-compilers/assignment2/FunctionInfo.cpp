@@ -29,10 +29,6 @@ using namespace llvm;
 
 namespace {
 
-    struct FunctionDetails {
-        
-    };
-
     class FunctionInfo : public ModulePass{
 
         public:
@@ -40,12 +36,15 @@ namespace {
             FunctionInfo() : ModulePass(ID) {} //default constructor
 
             virtual bool runOnFunction(Function &F) {
-                FunctionDetails func_details;
+                int arg_size = F.arg_size();
+                int num_call_sites = F.getNumUses();
+                int num_basic_blocks = F.size(); //defined in value class.
+                //count the number of instructions.
                 int number_of_instructions = 0;
                 for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I)
                     number_of_instructions += 1;
 
-                errs() << F.getName() <<": arguments=" << F.arg_size() << " call sites=" <<  F.getNumUses() << " basic blocks=" << F.size() << " instructions=" << number_of_instructions << "\n";
+                errs() << F.getName() <<": arguments=" << arg_size << " call sites=" <<  num_call_sites << " basic blocks=" << num_basic_blocks << " instructions=" << number_of_instructions << "\n";
                 return false;
             }
 

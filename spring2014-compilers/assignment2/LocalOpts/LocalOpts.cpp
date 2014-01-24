@@ -83,6 +83,6 @@ RegisterMyPass(PassManagerBuilder::EP_EarlyAsPossible,
 //    clang -c -emit-llvm loop.c
 //    opt -load ./FunctionInfo.so -function-info loop.bc > /dev/null
 // See http://llvm.org/releases/3.4/docs/WritingAnLLVMPass.html#running-a-pass-with-opt for more info.
-RegisterPass<LocalOpts> X("local-opts", "Local Optimizations");
+RegisterPass<LocalOpts> X("my-local-opts", "Local Optimizations");
 
 }

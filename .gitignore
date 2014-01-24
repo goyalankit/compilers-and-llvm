@@ -12,5 +12,13 @@
 *.la
 *.a
 
+#llvm specific
+*.bc
+
 # Binaries
 *.out
+
+
+#temp
+mem-tracing/instrumentation/
+

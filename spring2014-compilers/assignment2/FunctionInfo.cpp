@@ -35,12 +35,8 @@ namespace {
             static char ID;
             FunctionInfo() : ModulePass(ID) {} //default constructor
 
-            void printInfo(std::string into, formatted_raw_ostream &OS) {
-
-            }	
-
             virtual bool runOnFunction(Function &F) {
-                errs() << F.getName() << "\n";
+                errs() << F.getName() <<": arguments=" << F.arg_size() << "\n";
                 return false;
             }
 

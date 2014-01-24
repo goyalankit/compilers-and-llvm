@@ -36,7 +36,7 @@ namespace {
             FunctionInfo() : ModulePass(ID) { errs() << "\n"; } //default constructor
             ~FunctionInfo() { errs() << "\n";  }
 
-            virtual bool runOnFunction(Function &F) {
+            void printFunctionDetails(Function &F) {
                 int arg_size = F.arg_size();
                 int num_call_sites = F.getNumUses();
                 int num_basic_blocks = F.size(); //defined in value class.
@@ -46,13 +46,12 @@ namespace {
                     number_of_instructions += 1;
 
                 errs() << F.getName() <<": arguments=" << arg_size << " call sites=" <<  num_call_sites << " basic blocks=" << num_basic_blocks << " instructions=" << number_of_instructions << "\n\n";
-                return false;
             }
 
             virtual bool runOnModule(Module &M){
                 for (Module::iterator MI = M.begin(), ME = M.end(); MI != ME; ++MI)
                 {
-                    runOnFunction(*MI);
+                    printFunctionDetails(*MI);
                 }
                 return false;
             }

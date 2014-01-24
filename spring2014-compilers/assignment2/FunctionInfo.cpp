@@ -29,14 +29,14 @@ using namespace llvm;
 
 namespace {
 
-    class FunctionInfo : public FunctionPass{
+    class FunctionInfo : public ModulePass{
 
         public:
             static char ID;
-            FunctionInfo() : FunctionPass(ID) { errs() << "\n"; } //default constructor
+            FunctionInfo() : ModulePass(ID) { errs() << "\n"; } //default constructor
             ~FunctionInfo() { errs() << "\n";  }
 
-            virtual bool runOnFunction(Function &F){
+            void printFunctionDetails(Function &F) {
                 int arg_size = F.arg_size();
                 int num_call_sites = F.getNumUses();
                 int num_basic_blocks = F.size(); //defined in value class.
@@ -48,31 +48,40 @@ namespace {
                 errs() << F.getName() <<": arguments=" << arg_size << " call sites=" <<  num_call_sites << " basic blocks=" << num_basic_blocks << " instructions=" << number_of_instructions << "\n\n";
             }
 
-            // We don't modify the program, so we preserve all analyses
-            virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-                AU.setPreservesAll();
+            virtual bool runOnModule(Module &M){
+                for (Module::iterator MI = M.begin(), ME = M.end(); MI != ME; ++MI)
+                {
+                    printFunctionDetails(*MI);
+                }
+                return false;
             }
-    };
 
-    // LLVM uses the address of this static member to identify the pass, so the
-    // initialization value is unimportant.
-    char FunctionInfo::ID = 0;
 
-    // Register this pass to be used by language front ends.
-    // This allows this pass to be called using the command:
-    //    clang -c -Xclang -load -Xclang ./FunctionInfo.so loop.c
-    static void registerMyPass(const PassManagerBuilder &,
-            PassManagerBase &PM) {
-        PM.add(new FunctionInfo());
+    // We don't modify the program, so we preserve all analyses
+    virtual void getAnalysisUsage(AnalysisUsage &AU) const {
+        AU.setPreservesAll();
     }
-    RegisterStandardPasses
-        RegisterMyPass(PassManagerBuilder::EP_EarlyAsPossible,
-                registerMyPass);
+};
 
-    // Register the pass name to allow it to be called with opt:
-    //    clang -c -emit-llvm loop.c
-    //    opt -load ./FunctionInfo.so -function-info loop.bc > /dev/null
-    // See http://llvm.org/releases/3.4/docs/WritingAnLLVMPass.html#running-a-pass-with-opt for more info.
-    RegisterPass<FunctionInfo> X("function-info", "Function Information");
+// LLVM uses the address of this static member to identify the pass, so the
+// initialization value is unimportant.
+char FunctionInfo::ID = 0;
+
+// Register this pass to be used by language front ends.
+// This allows this pass to be called using the command:
+//    clang -c -Xclang -load -Xclang ./FunctionInfo.so loop.c
+static void registerMyPass(const PassManagerBuilder &,
+        PassManagerBase &PM) {
+    PM.add(new FunctionInfo());
+}
+RegisterStandardPasses
+RegisterMyPass(PassManagerBuilder::EP_EarlyAsPossible,
+        registerMyPass);
+
+// Register the pass name to allow it to be called with opt:
+//    clang -c -emit-llvm loop.c
+//    opt -load ./FunctionInfo.so -function-info loop.bc > /dev/null
+// See http://llvm.org/releases/3.4/docs/WritingAnLLVMPass.html#running-a-pass-with-opt for more info.
+RegisterPass<FunctionInfo> X("function-info", "Function Information");
 
 }

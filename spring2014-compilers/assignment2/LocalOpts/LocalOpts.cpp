@@ -47,42 +47,46 @@ namespace {
 
                 errs() << F.getName() <<": arguments=" << arg_size << " call sites=" <<  num_call_sites << " basic blocks=" << num_basic_blocks << " instructions=" << number_of_instructions << "\n\n";
             }
+            void runOnBasicBlock(BasicBlock &blk){
+                for (BasicBlock::iterator i = blk.begin(), e = blk.end(); i != e; ++i)
+                    errs() << *i << "\n"; //print instructions
+
+            }
 
             virtual bool runOnFunction(Function &func){
                 errs() << "Function: " << func.getName() << "\n";
-                for (Function::iterator i = func.begin(), e = func.end(); i != e; ++i){
-                    errs() << "Basic block (name=" << i->getName() << ") has " << i->size() << " instructions.\n";
+                for (Function::iterator i = func.begin(), e = func.end(); i != e; ++i){ //iterating over the basic blocks                    
+                    runOnBasicBlock(*i);
+                    //print_basic_block_info(*i);
                 }
 
                 return false;
             }
 
 
-    // We don't modify the program, so we preserve all analyses
-    virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-        AU.setPreservesAll();
+            // We don't modify the program, so we preserve all analyses
+            virtual void getAnalysisUsage(AnalysisUsage &AU) const {
+                AU.setPreservesAll();
+            }
+
+        private:
+            //helper functions
+            void print_basic_block_info(BasicBlock &b){
+                errs() << "Basic block (name=" << b.getName() << ") has " << b.size() << " instructions.\n";
+
+            }
+    };
+
+    char LocalOpts::ID = 0;
+
+    static void registerMyPass(const PassManagerBuilder &,
+            PassManagerBase &PM) {
+        PM.add(new LocalOpts());
     }
-};
+    RegisterStandardPasses
+        RegisterMyPass(PassManagerBuilder::EP_EarlyAsPossible,
+                registerMyPass);
 
-// LLVM uses the address of this static member to identify the pass, so the
-// initialization value is unimportant.
-char LocalOpts::ID = 0;
-
-// Register this pass to be used by language front ends.
-// This allows this pass to be called using the command:
-//    clang -c -Xclang -load -Xclang ./FunctionInfo.so loop.c
-static void registerMyPass(const PassManagerBuilder &,
-        PassManagerBase &PM) {
-    PM.add(new LocalOpts());
-}
-RegisterStandardPasses
-RegisterMyPass(PassManagerBuilder::EP_EarlyAsPossible,
-        registerMyPass);
-
-// Register the pass name to allow it to be called with opt:
-//    clang -c -emit-llvm loop.c
-//    opt -load ./FunctionInfo.so -function-info loop.bc > /dev/null
-// See http://llvm.org/releases/3.4/docs/WritingAnLLVMPass.html#running-a-pass-with-opt for more info.
-RegisterPass<LocalOpts> X("my-local-opts", "Local Optimizations");
+    RegisterPass<LocalOpts> X("my-local-opts", "Local Optimizations");
 
 }

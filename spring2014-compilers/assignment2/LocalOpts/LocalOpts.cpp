@@ -17,7 +17,7 @@
 #include "llvm/IR/Instruction.h"
 #include "llvm/DebugInfo.h"
 #include "llvm/Assembly/AssemblyAnnotationWriter.h"
-
+#include "llvm/IR/Constants.h"
 
 #include <ostream>
 #include <fstream>
@@ -28,6 +28,10 @@
 using namespace llvm;
 
 namespace {
+
+
+    APInt generalIntZero; //to take care of both 32 and 64 bits.
+    APInt generalIntOne;
 
     class LocalOpts : public FunctionPass{
 
@@ -47,12 +51,36 @@ namespace {
 
                 errs() << F.getName() <<": arguments=" << arg_size << " call sites=" <<  num_call_sites << " basic blocks=" << num_basic_blocks << " instructions=" << number_of_instructions << "\n\n";
             }
-            void runOnBasicBlock(BasicBlock &blk){
-                for (BasicBlock::iterator i = blk.begin(), e = blk.end(); i != e; ++i)
-                    errs() << *i << "\n"; //print instructions
 
+            void tryAlgebraicIdentitiesForAdd(Instruction &i){
+                errs() << i << "\n";
+                Type *tp = i.getType();
+                Value *operand1 = i.getOperand(0);
+                Value *operand2 = i.getOperand(1);
+                const IntegerType * intype ;
+                if(intype= dyn_cast<IntegerType>(i.getType()))
+                    errs() << "YAHOO! 1 haha" << "\n";
+                generalIntZero =  APInt(intype->getBitWidth(), 0);
+
+                ConstantInt *cint;
+                errs() << "Name\n" <<  operand1 -> getName();
+                if(cint = dyn_cast<ConstantInt>(operand2)){
+                    if(cint->getValue().eq(generalIntZero))
+                        errs() << "Kill me!" << "\n";
+                 }
+              //  errs() << "VALUE " << cint->getValue() << "\n";
             }
 
+            void runOnBasicBlock(BasicBlock &blk){
+                for (BasicBlock::iterator i = blk.begin(), e = blk.end(); i != e; ++i){
+                    Instruction *ii= dyn_cast<Instruction>(i);
+                    if(ii->getOpcode() == Instruction::Add)
+                        tryAlgebraicIdentitiesForAdd(*ii);
+//                        errs() << *ii << "  --- " << ii->getOpcode() << "\n";
+                    }
+            }
+
+            
             virtual bool runOnFunction(Function &func){
                 errs() << "Function: " << func.getName() << "\n";
                 for (Function::iterator i = func.begin(), e = func.end(); i != e; ++i){ //iterating over the basic blocks                    

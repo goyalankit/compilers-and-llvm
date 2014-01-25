@@ -24,21 +24,10 @@
 #include <iostream>
 #include <stdlib.h>
 #include <string>
-
+#include "generic_methods.h"
 using namespace llvm;
 
 namespace {
-
-    /* Arbitrary precision constant values. To take care of both 32 bit and 64 bit numbers. */
-    template <typename APType> APType getZeroOne(unsigned num_bits, int zeroOne);
-    template <> APFloat getZeroOne(unsigned num_bits, int zeroOne) { return APFloat((float)zeroOne); }
-    template <> APInt   getZeroOne(unsigned num_bits, int zeroOne) { return APInt(num_bits,zeroOne); }
-
-    /* Compare value based on the type values to identify algebraic identities */
-    /* generalize compare method based on type */
-    template <typename ConstantType, typename APType> bool id_compare(ConstantType& cint, APType zero);
-    template <> bool id_compare(ConstantFP& cint, APFloat zero) { return cint.getValueAPF().compare(zero) == APFloat::cmpEqual; }
-    template <> bool id_compare(ConstantInt& cint, APInt zero) { return cint.getValue().eq(zero); }
 
     template<typename APType, typename ConstantType>
         Value * algIdentity(Instruction &i, APType generalZero){
@@ -59,6 +48,14 @@ namespace {
             return NULL;
         }
 
+    void makeTheChanges(BasicBlock::iterator &i, Value* val){
+        i->replaceAllUsesWith(val);     //replace all uses of the registers with the value
+        BasicBlock::iterator j = i;     //record the location of the instruction
+        ++i;                            //increment the pointer
+        j->eraseFromParent();           //delete the instruction from the basic block
+        --i;                            //rollback to the previous statement.
+    }
+    
     void tryAlgebraicIdentities(Instruction *ii, BasicBlock::iterator& i, Type *instructionType){
         Value *v;
         IntegerType *intype;
@@ -67,12 +64,15 @@ namespace {
         switch(ii->getOpcode()){
             case Instruction::Add: 
                 v = algIdentity<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),0));
+                if(v) makeTheChanges(i, v);
                 break; //X+0 = 0+X = X  
             case Instruction::FAdd:
                 v = algIdentity<APFloat, ConstantFP>(*ii, getZeroOne<APFloat>(0,0)); 
+                if(v) makeTheChanges(i, v);
                 break; //X+0 = 0+X = X
             case Instruction::Sub: 
                 v = algIdentity<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),0));  
+                if(v) makeTheChanges(i, v);
                 break; //X-0 = X; 0-X=-X
                 //if(ii->getOpcode() == Instruction::Add)
                 //errs() << *ii << "  --- " << ii->getOpcode() << "\n";

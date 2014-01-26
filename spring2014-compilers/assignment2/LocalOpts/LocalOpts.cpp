@@ -5,6 +5,8 @@
 // Modified by Ankit Goyal
 ////////////////////////////////////////////////////////////////////////////////
 
+#define DEBUG_TYPE "my-local-opts" 
+
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -14,10 +16,14 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/InstIterator.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/DebugInfo.h"
 #include "llvm/Assembly/AssemblyAnnotationWriter.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/ADT/Statistic.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/InstVisitor.h"
 
 #include <ostream>
 #include <fstream>
@@ -25,12 +31,32 @@
 #include <stdlib.h>
 #include <string>
 #include "generic_methods.h"
+
+STATISTIC(NumXForms, "The # of algebric identies transformations performed");
+STATISTIC(NumConstFolds, "The # of constant folding operations");
+
 using namespace llvm;
 
 namespace {
 
+    struct ConstantFolding : public InstVisitor<ConstantFolding> {
+        void visitStoreInst(StoreInst &I){ 
+            Value* str_ptr  = I.getPointerOperand();
+            Value* v= I.getValueOperand();
+            if(isa<Constant>(*v)){
+                for(Value::use_iterator ui = str_ptr -> use_begin(), e = str_ptr->use_end(); ui != e; ++ui){
+                    if(LoadInst *pinst = dyn_cast<LoadInst>(*ui)){
+                        pinst->replaceAllUsesWith(v);
+                        ++NumConstFolds;
+                    }
+                }
+            }
+         }
+    };
+
+
     template<typename APType, typename ConstantType>
-        Value * algIdentity(Instruction &i, APType generalZero){
+        Value * algIdentityAS(Instruction &i, APType generalZero){
             errs() << i << "\n";
             Value *operand1 = i.getOperand(0);
             Value *operand2 = i.getOperand(1);
@@ -48,34 +74,49 @@ namespace {
             return NULL;
         }
 
-    void makeTheChanges(BasicBlock::iterator &i, Value* val){
-        i->replaceAllUsesWith(val);     //replace all uses of the registers with the value
-        BasicBlock::iterator j = i;     //record the location of the instruction
-        ++i;                            //increment the pointer
-        j->eraseFromParent();           //delete the instruction from the basic block
-        --i;                            //rollback to the previous statement.
+
+    void makeTheChanges(BasicBlock::iterator &ib, Value* val){
+        ++NumXForms;
+        Instruction* bb = ib;
+        ReplaceInstWithValue(bb->getParent()->getInstList(), ib,val);
+
     }
-    
+
     void tryAlgebraicIdentities(Instruction *ii, BasicBlock::iterator& i, Type *instructionType){
         Value *v;
         IntegerType *intype;
         intype = dyn_cast<IntegerType>(instructionType);
 
         switch(ii->getOpcode()){
+            case Instruction::Store:{ //note the explicit block here. Otherwise variables can't be defined inside case since they are in scope for other but not initialized
+                                        ConstantFolding CF;
+                                        CF.visit(cast<StoreInst>(ii));
+                                        break;
+                                    }
             case Instruction::Add: 
-                v = algIdentity<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),0));
-                if(v) makeTheChanges(i, v);
-                break; //X+0 = 0+X = X  
+                                    v = algIdentityAS<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),0));
+                                    if(v) makeTheChanges(i, v);
+                                    break; //X+0 = 0+X = X  
             case Instruction::FAdd:
-                v = algIdentity<APFloat, ConstantFP>(*ii, getZeroOne<APFloat>(0,0)); 
-                if(v) makeTheChanges(i, v);
-                break; //X+0 = 0+X = X
+                                    v = algIdentityAS<APFloat, ConstantFP>(*ii, getZeroOne<APFloat>(0,0)); 
+                                    if(v) makeTheChanges(i, v);
+                                    break; //X+0 = 0+X = X
             case Instruction::Sub: 
-                v = algIdentity<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),0));  
-                if(v) makeTheChanges(i, v);
-                break; //X-0 = X; 0-X=-X
-                //if(ii->getOpcode() == Instruction::Add)
-                //errs() << *ii << "  --- " << ii->getOpcode() << "\n";
+                                    v = algIdentityAS<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),0));  
+                                    if(v) makeTheChanges(i, v);
+                                    break; //X-0 = X; 0-X=-X
+            case Instruction::FSub: 
+                                    v = algIdentityAS<APFloat, ConstantFP>(*ii, getZeroOne<APFloat>(0,0));  
+                                    if(v) makeTheChanges(i, v);
+                                    break; //X-0 = X; 0-X=-X
+            case Instruction::Mul:
+                                    v = algIdentityAS<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),1));  
+                                    if(v) makeTheChanges(i, v);
+                                    break; //X*1 = X; 1*X=X
+            case Instruction::FMul:
+                                    v = algIdentityAS<APFloat, ConstantFP>(*ii, getZeroOne<APFloat>(0,1));  
+                                    if(v) makeTheChanges(i, v);
+                                    break; //X*0 = X; 0*X=-X
         }               
     }
 

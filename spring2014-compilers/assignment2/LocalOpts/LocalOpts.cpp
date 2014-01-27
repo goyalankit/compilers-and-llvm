@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <string>
 #include "generic_methods.h"
+//#include "my_arithmatic.h"
 
 STATISTIC(NumXForms, "The # of algebric identies transformations performed");
 STATISTIC(NumConstFolds, "The # of constant folding operations");
@@ -51,12 +52,12 @@ namespace {
                     }
                 }
             }
-         }
+        }
     };
 
 
     template<typename APType, typename ConstantType>
-        Value * algIdentityAS(Instruction &i, APType generalZero){
+        Value * algIdentityAS(Instruction &i, APType generalZeroOne){
             errs() << i << "\n";
             Value *operand1 = i.getOperand(0);
             Value *operand2 = i.getOperand(1);
@@ -64,13 +65,67 @@ namespace {
             /* Constant types */
             ConstantType *cint; 
             if(cint = dyn_cast<ConstantType>(operand2)){
-                if(id_compare<ConstantType, APType>(*cint, generalZero))
+                if(id_compare<ConstantType, APType>(*cint, generalZeroOne))
                     return cint;
             }
             else if(cint = dyn_cast<ConstantType>(operand1)){
-                if(id_compare<ConstantType, APType>(*cint, generalZero))
+                if(id_compare<ConstantType, APType>(*cint, generalZeroOne))
                     return cint;
             }
+            return NULL;
+        }
+
+
+
+    //TODO Refactor this thing!
+    template<typename APType, typename ConstantType>
+        Value * algIdentityMD(Instruction &i, APType generalZeroOne, int operation, int identity){ //0: Multiplication. 1 Division
+            errs() << i << "\n";
+            Value *operand1 = i.getOperand(0);
+            Value *operand2 = i.getOperand(1);
+            /* ConstantInt and ConstantFP. http://llvm.org/docs/doxygen/html/Constants_8h.html */
+            /* Constant types */
+            ConstantType *cint; 
+            switch(operation){
+                case 0:{ //multiplication
+                           if(identity == 0){
+                               if(cint = dyn_cast<ConstantType>(operand2)){ //operand 2 is 0 and it's multiplication
+                                   if(id_compare<ConstantType, APType>(*cint, generalZeroOne)) 
+                                       return ConstantType::get(cint->getContext(), generalZeroOne);
+                               }
+                               else if(cint = dyn_cast<ConstantType>(operand1)){ //operand 1 is 0 and it's multiplication
+                                   if(id_compare<ConstantType, APType>(*cint, generalZeroOne))
+                                       return ConstantType::get(cint->getContext(), generalZeroOne);
+                               }
+                           }else if(identity == 1){
+                               if(cint = dyn_cast<ConstantType>(operand2)){ //operand 2 is 1 and it's multiplication
+                                   if(id_compare<ConstantType, APType>(*cint, generalZeroOne)) 
+                                       return cint;
+                               }
+                               else if(cint = dyn_cast<ConstantType>(operand1)){ //operand 1 is 0 and it's multiplication
+                                   if(id_compare<ConstantType, APType>(*cint, generalZeroOne))
+                                       return cint;
+                               }
+
+                           }
+                           break;
+                       }
+                case 1:{ //division
+                           if(identity == 0){
+                               if(cint = dyn_cast<ConstantType>(operand1)){ //operand 1 is 0 and it's division 0 / X = 0
+                                   if(id_compare<ConstantType, APType>(*cint, generalZeroOne))
+                                       return ConstantType::get(cint->getContext(), generalZeroOne);
+                               }
+                           }else if(identity == 1){
+                               if(cint = dyn_cast<ConstantType>(operand2)){ //operand 2 is 1 and it's division X / 1 = X
+                                   if(id_compare<ConstantType, APType>(*cint, generalZeroOne)) 
+                                       return cint; //if operand 2 is 1 return X
+                               }
+                           }
+                           break;
+                       }
+            }
+
             return NULL;
         }
 
@@ -79,10 +134,13 @@ namespace {
         ++NumXForms;
         Instruction* bb = ib;
         ReplaceInstWithValue(bb->getParent()->getInstList(), ib,val);
-
     }
 
-    void tryAlgebraicIdentities(Instruction *ii, BasicBlock::iterator& i, Type *instructionType){
+    void reduce_strength(BasicBlock::iterator &ib, ConstantInt &cint, unsigned reduction_factor){
+        errs() << "Reducing strength";
+    }
+
+    void optimize(Instruction *ii, BasicBlock::iterator& i, Type *instructionType){
         Value *v;
         IntegerType *intype;
         intype = dyn_cast<IntegerType>(instructionType);
@@ -110,22 +168,63 @@ namespace {
                                     if(v) makeTheChanges(i, v);
                                     break; //X-0 = X; 0-X=-X
             case Instruction::Mul:
-                                    v = algIdentityAS<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),1));  
-                                    if(v) makeTheChanges(i, v);
+                                    v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),1), 0, 1);  //X * 1 = X , 1 * X = X; operation = 0 identity = 1
+                                    if(v) { makeTheChanges(i, v); break;}
+                                    else if (v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),0), 0, 0)){ //X * 0 = 0, 0 * X = 0 OP=0 ID = 0
+                                        makeTheChanges(i, v); break; }
+
                                     break; //X*1 = X; 1*X=X
             case Instruction::FMul:
-                                    v = algIdentityAS<APFloat, ConstantFP>(*ii, getZeroOne<APFloat>(0,1));  
-                                    if(v) makeTheChanges(i, v);
-                                    break; //X*0 = X; 0*X=-X
+                                    v = algIdentityMD<APFloat, ConstantFP>(*ii, getZeroOne<APFloat>(0,1), 0, 1);  //OP=0 ID=1
+                                    if(v) { makeTheChanges(i, v); break ; }
+                                    else if(v = algIdentityMD<APFloat, ConstantFP>(*ii, getZeroOne<APFloat>(0,1), 0, 0))//OP=0 ID=0
+                                    { makeTheChanges(i, v); break ;}
+                                    break; //X*0 = X; 0*X=-X //NEED TO CHECK THIS CASE
+            case Instruction::UDiv:
+            case Instruction::SDiv:
+                                    if(v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),1),1,1))// X / 1 = X; OP=1 ID=1
+                                    {makeTheChanges(i, v); break;}
+                                    else if(v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),0),1,0)) // X / 1 = X OP=1 ID=0
+                                    {      
+                                        makeTheChanges(i,v); break;
+                                    }
+
+                                    break;
+            case Instruction::FDiv:
+                                    if(v = algIdentityMD<APFloat, ConstantFP>(*ii, getZeroOne<APFloat>(0,1),1,1))// X / 1 = X; OP=1 ID=1
+                                    {makeTheChanges(i, v); break;}
+                                    else if(v = algIdentityMD<APFloat, ConstantFP>(*ii, getZeroOne<APFloat>(0,0),1,0)) // X / 1 = X OP=1 ID=0
+                                    {      
+                                        makeTheChanges(i,v); break;
+                                    }
+
+                                    break;
+
         }               
+
+
+        //Constant Folding
+        if(ii->getNumOperands() == 2 && isa<Constant>(ii->getOperand(0)) && isa<Constant>(ii->getOperand(1))){
+ //           v = fold_constants(op, ii->getOperand(0), ii->getOperand(1));
+   //         makeTheChanges(i,v);
+        }
+
+        //strength reduction
+        if(ii->getOpcode() == Instruction::Mul){
+            ConstantInt *op1;
+            if(op1 = dyn_cast<ConstantInt>(ii->getOperand(0)) && op1.isPowerOf2()){
+                  unsigned reduction_factor = op1.logBase2();
+                  reduce_strength(i, op1, reduction_factor);
+            }
+        }
     }
 
-    void tryConstantFolding(Instruction *ii, Value *bb_it){
-        errs() << "CONSTANT: " << *ii << "\n";
-        if(ii->getNumOperands() == 2 && isa<Constant>(ii->getOperand(0)) && isa<Constant>(ii->getOperand(1)))
-            errs() << *ii << "\n" << "constant folding  here\n";
-    }
-
+    /*    void tryConstantFolding(Instruction *ii, Value *bb_it){
+          errs() << "CONSTANT: " << *ii << "\n";
+          if(ii->getNumOperands() == 2 && isa<Constant>(ii->getOperand(0)) && isa<Constant>(ii->getOperand(1)))
+          errs() << *ii << "\n" << "constant folding  here\n";
+          }
+     */
 
     class LocalOpts : public FunctionPass{
 
@@ -152,8 +251,7 @@ namespace {
             void runOnBasicBlock(BasicBlock &blk){
                 for (BasicBlock::iterator i = blk.begin(), e = blk.end(); i != e; ++i){
                     Instruction *ii= dyn_cast<Instruction>(i);
-                    tryAlgebraicIdentities(ii,i,i->getType());
-                    //tryConstantFolding(ii,i);
+                    optimize(ii,i,i->getType());
                 }
             }
 

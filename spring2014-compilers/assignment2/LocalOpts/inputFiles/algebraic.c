@@ -9,6 +9,8 @@ int compute (int a, int b)
   result -= result;
   result = b + 0;
   result = b - 0;
+  result = 0 - b;
+  result = 1 * b;
   resultf = f + 0;
   result = 2 + 2;
   return result;

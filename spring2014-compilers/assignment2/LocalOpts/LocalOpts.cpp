@@ -127,11 +127,10 @@ namespace {
         APInt apint = cint.getValue();
         unsigned reduction_factor = apint.logBase2();
         BinaryOperator* shift_instruction ;
-        if(opcode == Instruction::Add)
+        if(opcode == Instruction::Mul)
             shift_instruction = BinaryOperator::Create( Instruction::Shl, &other, ConstantInt::get(cint.getType(), reduction_factor, false));
         else
-            return;
-        //shift_instruction = BinaryOperator::Create( Instruction::AShr, &other, ConstantInt::get(cint.getType(), reduction_factor, false));
+            shift_instruction = BinaryOperator::Create( Instruction::AShr, &other, ConstantInt::get(cint.getType(), reduction_factor, false));
         Instruction *ii= ib;
         ii->getParent()->getInstList().insertAfter(ib, shift_instruction);
         makeTheChanges(ib, shift_instruction);

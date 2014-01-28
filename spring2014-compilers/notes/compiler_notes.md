@@ -36,11 +36,11 @@ Source code
 
 **Reverse Extended basic block**
 	
+---
+#### Paper Review:
 
-
-
-Review:
 **Overcoming the challenges to Feedback-Directed Optimization**
+
 Paper presents quite an interesting view on feedback based optimizations.
 
 Branch-based phase behavior is very similar to the problem of predicting best rate for transmission in networks. The main problem is what amount of interval you need to consider to predict the best rate. In one of the papers, authors show that the mutual information decreases between subsequent dropped packets over a long interval. This seems to be the behavior of phased behavior. If one considers a short enough interval to predict the branch, I think a good performance can be achieved. 

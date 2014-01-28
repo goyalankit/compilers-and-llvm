@@ -44,7 +44,7 @@ namespace {
 
     template<typename APType, typename ConstantType>
         Value * algIdentityAS(Instruction &i, APType generalZeroOne, int operation){
-            errs() << i << "\n";
+            //errs() << i << "\n";
             Value *operand1 = i.getOperand(0);
             Value *operand2 = i.getOperand(1);
             /* ConstantInt and ConstantFP. http://llvm.org/docs/doxygen/html/Constants_8h.html */
@@ -118,8 +118,14 @@ namespace {
 
 
     void makeTheChanges(BasicBlock::iterator &ib, Value* val){
+//        ib->replaceAllUsesWith(val);
+//        BasicBlock::iterator j = ib;
+ //       ++ib;
+ //       j->eraseFromParent();
+ //       --ib;
         Instruction* bb = ib;
         ReplaceInstWithValue(bb->getParent()->getInstList(), ib,val);
+        ib--;
     }
 
     void reduce_strength(BasicBlock::iterator &ib, ConstantInt &cint, Value &other, unsigned opcode){
@@ -134,11 +140,31 @@ namespace {
         Instruction *ii= ib;
         ii->getParent()->getInstList().insertAfter(ib, shift_instruction);
         makeTheChanges(ib, shift_instruction);
+        ib++;
     }
     bool can_reduce_strength(ConstantInt& tcint){
         APInt op1 = tcint.getValue();
         if(op1.isPowerOf2()) return true;
         return false;
+    }
+
+    ConstantInt* fold_constants(unsigned operation, ConstantInt *op1, ConstantInt *op2){
+       switch(operation){
+        case Instruction::Add:
+            return ConstantInt::get(op1->getContext(), op1->getValue() + op2->getValue());
+        case Instruction::Sub:
+            return ConstantInt::get(op1->getContext(), op1->getValue() + op2->getValue());
+        case Instruction::Mul:
+            return ConstantInt::get(op1->getContext(), op1->getValue() * op2->getValue());
+        case Instruction::UDiv:
+            return ConstantInt::get(op1->getContext(), op1->getValue().udiv(op2->getValue()));
+        case Instruction::SDiv:
+            return ConstantInt::get(op1->getContext(), op1->getValue().sdiv(op2->getValue()));
+
+       }
+       return NULL;
+       errs() << "An opportunity to fold constants here.." ;
+        
     }
 
 
@@ -196,9 +222,9 @@ namespace {
         }               
 
         //Constant Folding
-        if(ii->getNumOperands() == 2 && isa<Constant>(ii->getOperand(0)) && isa<Constant>(ii->getOperand(1))){
-            //           v = fold_constants(op, ii->getOperand(0), ii->getOperand(1));
-            //         makeTheChanges(i,v);
+        if((ii->getNumOperands() == 2) && isa<Constant>(ii->getOperand(0)) && isa<Constant>(ii->getOperand(1))){
+                       Value *v1 = fold_constants(ii->getOpcode(), dyn_cast<ConstantInt>(ii->getOperand(0)), dyn_cast<ConstantInt>(ii->getOperand(1)));
+                  if(v1) {  makeTheChanges(i,v1);++NumConstFolds; }
         }
 
         //strength reduction

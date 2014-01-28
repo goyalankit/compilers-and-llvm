@@ -9,5 +9,6 @@ int compute ()
   result += b;
   result *= c;
   result /= 2;
+  result += a/a;
   return result;
 }

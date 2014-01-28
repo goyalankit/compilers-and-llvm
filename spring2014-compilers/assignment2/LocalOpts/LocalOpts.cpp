@@ -49,14 +49,19 @@ namespace {
             Value *operand1 = i.getOperand(0);
             Value *operand2 = i.getOperand(1);
             /* ConstantInt and ConstantFP. http://llvm.org/docs/doxygen/html/Constants_8h.html */
-            /* Constant types */
+            /* Constant types */            
             ConstantType *cint; 
+
+            //check for X-X case. Only checked for subtraction. Check if the variables are identical.
+            if (operation == 1 && cast<Instruction>(operand1)->isIdenticalTo(cast<Instruction>(operand2))) {
+                return ConstantType::get(cint->getContext(), APInt(generalZeroOne.getBitWidth(),0));
+            }
 
             if(cint = dyn_cast<ConstantType>(operand2)){
                 if(id_compare<ConstantType, APType>(*cint, generalZeroOne))
                     return operand1;
             }
-            else if((cint = dyn_cast<ConstantType>(operand1)) && operation!=1){
+            else if((cint = dyn_cast<ConstantType>(operand1)) && operation!=1){ 
                 if(id_compare<ConstantType, APType>(*cint, generalZeroOne))
                     return operand2;
             }
@@ -99,6 +104,9 @@ namespace {
                            break;
                        }
                 case 1:{ //division
+ //                          if (cast<Instruction>(operand1)->isIdenticalTo(cast<Instruction>(operand2))) {
+   //                            return ConstantType::get(cint->getContext(), APInt(generalZeroOne.getBitWidth(),1));
+     //                      }
                            if(identity == 0){
                                if(cint = dyn_cast<ConstantType>(operand1)){ //operand 1 is 0 and it's division 0 / X = 0
                                    if(id_compare<ConstantType, APType>(*cint, generalZeroOne))
@@ -124,9 +132,9 @@ namespace {
         ++ib;
         j->eraseFromParent();
         if(ib != ib->getParent()->begin()){
-           --ib;
+            --ib;
         }else{
-           replay = true;
+            replay = true;
         }
     }
 
@@ -194,9 +202,9 @@ namespace {
             void runOnBasicBlock(BasicBlock &blk){
                 for (BasicBlock::iterator i = blk.begin(), e = blk.end(); i != e; ++i){
                     if(replay){
-                         i = blk.begin(); 
-                            replay = true;
-                        }
+                        i = blk.begin(); 
+                        replay = true;
+                    }
 
                     Instruction *ii= dyn_cast<Instruction>(i);
 

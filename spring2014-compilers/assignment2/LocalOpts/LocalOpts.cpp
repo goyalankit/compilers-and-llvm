@@ -41,6 +41,7 @@ using namespace llvm;
 
 namespace {
 
+    bool replay = false;
 
     template<typename APType, typename ConstantType>
         Value * algIdentityAS(Instruction &i, APType generalZeroOne, int operation){
@@ -118,14 +119,15 @@ namespace {
 
 
     void makeTheChanges(BasicBlock::iterator &ib, Value* val){
-//        ib->replaceAllUsesWith(val);
-//        BasicBlock::iterator j = ib;
- //       ++ib;
- //       j->eraseFromParent();
- //       --ib;
-        Instruction* bb = ib;
-        ReplaceInstWithValue(bb->getParent()->getInstList(), ib,val);
-        ib--;
+        ib->replaceAllUsesWith(val);
+        BasicBlock::iterator j = ib;
+        ++ib;
+        j->eraseFromParent();
+        if(ib != ib->getParent()->begin()){
+           --ib;
+           replay = true;
+
+        }
     }
 
     void reduce_strength(BasicBlock::iterator &ib, ConstantInt &cint, Value &other, unsigned opcode){
@@ -137,8 +139,7 @@ namespace {
             shift_instruction = BinaryOperator::Create( Instruction::Shl, &other, ConstantInt::get(cint.getType(), reduction_factor, false));
         else
             shift_instruction = BinaryOperator::Create( Instruction::AShr, &other, ConstantInt::get(cint.getType(), reduction_factor, false));
-        Instruction *ii= ib;
-        ii->getParent()->getInstList().insertAfter(ib, shift_instruction);
+        ib->getParent()->getInstList().insertAfter(ib, shift_instruction);
         makeTheChanges(ib, shift_instruction);
         ib++;
     }
@@ -149,106 +150,25 @@ namespace {
     }
 
     ConstantInt* fold_constants(unsigned operation, ConstantInt *op1, ConstantInt *op2){
-       switch(operation){
-        case Instruction::Add:
-            return ConstantInt::get(op1->getContext(), op1->getValue() + op2->getValue());
-        case Instruction::Sub:
-            return ConstantInt::get(op1->getContext(), op1->getValue() + op2->getValue());
-        case Instruction::Mul:
-            return ConstantInt::get(op1->getContext(), op1->getValue() * op2->getValue());
-        case Instruction::UDiv:
-            return ConstantInt::get(op1->getContext(), op1->getValue().udiv(op2->getValue()));
-        case Instruction::SDiv:
-            return ConstantInt::get(op1->getContext(), op1->getValue().sdiv(op2->getValue()));
-
-       }
-       return NULL;
-       errs() << "An opportunity to fold constants here.." ;
-        
-    }
-
-
-    void optimize(Instruction *ii, BasicBlock::iterator& i, Type *instructionType){
-        Value *v;
-        IntegerType *intype;
-        intype = dyn_cast<IntegerType>(instructionType);
-
-        switch(ii->getOpcode()){
-            case Instruction::Add: 
-                v = algIdentityAS<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),0),0);
-                if(v) { 
-                    makeTheChanges(i, v);                                             
-                    ++NumXForms;
-                }
-
-                break; //X+0 = 0+X = X  
-            case Instruction::Sub: 
-                v = algIdentityAS<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),0), 1);  
-                if(v) { 
-                    makeTheChanges(i, v); 
-                    ++NumXForms;
-                }
-                break; //X-0 = X;
-            case Instruction::Mul:{
-                                      v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),1), 0, 1);  //X * 1 = X , 1 * X = X; operation = 0 identity = 1
-                                      if(v) { 
-                                          makeTheChanges(i, v); 
-                                          ++NumXForms;
-
-                                      }
-
-                                      else if (v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),0), 0, 0)){ //X * 0 = 0, 0 * X = 0 OP=0 ID = 0
-                                          makeTheChanges(i, v); 
-                                          ++NumXForms;
-                                      }
-                                      break; //X*1 = X; 1*X=X
-                                  }
-
+        switch(operation){
+            case Instruction::Add:
+                return ConstantInt::get(op1->getContext(), op1->getValue() + op2->getValue());
+            case Instruction::Sub:
+                return ConstantInt::get(op1->getContext(), op1->getValue() + op2->getValue());
+            case Instruction::Mul:
+                return ConstantInt::get(op1->getContext(), op1->getValue() * op2->getValue());
             case Instruction::UDiv:
-            case Instruction::SDiv:{
-                                       if(v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),1),1,1))// X / 1 = X; OP=1 ID=1
-                                       {
-                                           makeTheChanges(i, v); 
-                                           ++NumXForms;
-                                       }
-                                       else if(v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),0),1,0)) // X / 1 = X OP=1 ID=0
-                                       {      
-                                           makeTheChanges(i,v); 
-                                           ++NumXForms;
-                                       }
-                                       break;
-                                   }
-            default: break;
-        }               
-
-        //Constant Folding
-        if((ii->getNumOperands() == 2) && isa<Constant>(ii->getOperand(0)) && isa<Constant>(ii->getOperand(1))){
-                       Value *v1 = fold_constants(ii->getOpcode(), dyn_cast<ConstantInt>(ii->getOperand(0)), dyn_cast<ConstantInt>(ii->getOperand(1)));
-                  if(v1) {  makeTheChanges(i,v1);++NumConstFolds; }
-        }
-
-        //strength reduction
-
-        switch(ii->getOpcode()){
-            case Instruction::UDiv:
+                return ConstantInt::get(op1->getContext(), op1->getValue().udiv(op2->getValue()));
             case Instruction::SDiv:
-            case Instruction::Mul:{
-                                      ConstantInt *tcint;
-                                      Value *other;
-                                      if((tcint = dyn_cast<ConstantInt>(ii->getOperand(0))) && can_reduce_strength(*tcint)){
-                                          other = ii->getOperand(0);
-                                          reduce_strength(i, *tcint, *other,ii->getOpcode());
-                                      }              
-                                      else if((tcint = dyn_cast<ConstantInt>(ii->getOperand(1))) && can_reduce_strength(*tcint)){
-                                          other = ii->getOperand(0);
-                                          reduce_strength(i, *tcint, *other,ii->getOpcode());
-                                      }
-                                      break;
-                                  }
-            default: break;
+                return ConstantInt::get(op1->getContext(), op1->getValue().sdiv(op2->getValue()));
+
         }
+        return NULL;
+        errs() << "An opportunity to fold constants here.." ;
 
     }
+
+
     class LocalOpts : public FunctionPass{
 
         public:
@@ -273,8 +193,100 @@ namespace {
 
             void runOnBasicBlock(BasicBlock &blk){
                 for (BasicBlock::iterator i = blk.begin(), e = blk.end(); i != e; ++i){
+                    if(replay)
+                        i = blk.begin();
                     Instruction *ii= dyn_cast<Instruction>(i);
-                    optimize(ii,i,i->getType());
+
+                    Value *v;
+                    IntegerType *intype;
+                    intype = dyn_cast<IntegerType>(i->getType());
+
+                    switch(ii->getOpcode()){
+                        case Instruction::Add: 
+                            v = algIdentityAS<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),0),0);
+                            if(v) { 
+                                makeTheChanges(i, v);                                             
+                                ++NumXForms;
+                                continue;
+                            }
+
+                            break; //X+0 = 0+X = X  
+                        case Instruction::Sub: 
+                            v = algIdentityAS<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),0), 1);  
+                            if(v) { 
+                                makeTheChanges(i, v); 
+                                ++NumXForms;
+                                continue;
+                            }
+                            break; //X-0 = X;
+                        case Instruction::Mul:{
+                                                  v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),1), 0, 1);  //X * 1 = X , 1 * X = X; operation = 0 identity = 1
+                                                  if(v) { 
+                                                      makeTheChanges(i, v); 
+                                                      ++NumXForms;
+                                                      continue;
+
+                                                  }
+
+                                                  else if (v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),0), 0, 0)){ //X * 0 = 0, 0 * X = 0 OP=0 ID = 0
+                                                      makeTheChanges(i, v); 
+                                                      ++NumXForms;
+                                                      continue;
+                                                  }
+                                                  break; //X*1 = X; 1*X=X
+                                              }
+
+                        case Instruction::UDiv:
+                        case Instruction::SDiv:{
+                                                   if(v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),1),1,1))// X / 1 = X; OP=1 ID=1
+                                                   {
+                                                       makeTheChanges(i, v); 
+                                                       ++NumXForms;
+                                                       continue;
+                                                   }
+                                                   else if(v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),0),1,0)) // X / 1 = X OP=1 ID=0
+                                                   {      
+                                                       makeTheChanges(i,v); 
+                                                       ++NumXForms;
+                                                       continue;
+                                                   }
+                                                   break;
+                                               }
+                        default: break;
+                    }               
+
+                    //Constant Folding
+                    if((ii->getNumOperands() == 2) && isa<Constant>(ii->getOperand(0)) && isa<Constant>(ii->getOperand(1))){
+                        Value *v1 = fold_constants(ii->getOpcode(), dyn_cast<ConstantInt>(ii->getOperand(0)), dyn_cast<ConstantInt>(ii->getOperand(1)));
+                        if(v1) {  
+                            makeTheChanges(i,v1);
+                            ++NumConstFolds; 
+                            continue;
+                        }
+                    }
+
+                    //strength reduction
+
+                    switch(ii->getOpcode()){
+                        case Instruction::UDiv:
+                        case Instruction::SDiv:
+                        case Instruction::Mul:{
+                                                  ConstantInt *tcint;
+                                                  Value *other;
+                                                  if((tcint = dyn_cast<ConstantInt>(ii->getOperand(0))) && can_reduce_strength(*tcint)){
+                                                      other = ii->getOperand(0);
+                                                      reduce_strength(i, *tcint, *other,ii->getOpcode());
+                                                  }              
+                                                  else if((tcint = dyn_cast<ConstantInt>(ii->getOperand(1))) && can_reduce_strength(*tcint)){
+                                                      other = ii->getOperand(0);
+                                                      reduce_strength(i, *tcint, *other,ii->getOpcode());
+                                                  }
+                                                  break;
+                                              }
+                        default: break;
+                    }
+
+
                 }
             }
 

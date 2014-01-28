@@ -41,7 +41,7 @@ using namespace llvm;
 
 namespace {
 
-    bool replay = false;
+    bool replay = false; //in case the first statement is optimized. replay the first statement for optimization.
 
     template<typename APType, typename ConstantType>
         Value * algIdentityAS(Instruction &i, APType generalZeroOne, int operation){
@@ -193,8 +193,10 @@ namespace {
 
             void runOnBasicBlock(BasicBlock &blk){
                 for (BasicBlock::iterator i = blk.begin(), e = blk.end(); i != e; ++i){
-                    if(replay)
+                    if(replay){
                         i = blk.begin();
+                        replay = false;
+                    }
                     Instruction *ii= dyn_cast<Instruction>(i);
 
                     Value *v;
@@ -266,7 +268,6 @@ namespace {
                     }
 
                     //strength reduction
-
                     switch(ii->getOpcode()){
                         case Instruction::UDiv:
                         case Instruction::SDiv:
@@ -276,10 +277,12 @@ namespace {
                                                   if((tcint = dyn_cast<ConstantInt>(ii->getOperand(0))) && can_reduce_strength(*tcint)){
                                                       other = ii->getOperand(0);
                                                       reduce_strength(i, *tcint, *other,ii->getOpcode());
+                                                      continue;
                                                   }              
                                                   else if((tcint = dyn_cast<ConstantInt>(ii->getOperand(1))) && can_reduce_strength(*tcint)){
                                                       other = ii->getOperand(0);
                                                       reduce_strength(i, *tcint, *other,ii->getOpcode());
+                                                      continue;
                                                   }
                                                   break;
                                               }

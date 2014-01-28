@@ -125,8 +125,8 @@ namespace {
         j->eraseFromParent();
         if(ib != ib->getParent()->begin()){
            --ib;
+        }else{
            replay = true;
-
         }
     }
 
@@ -194,9 +194,10 @@ namespace {
             void runOnBasicBlock(BasicBlock &blk){
                 for (BasicBlock::iterator i = blk.begin(), e = blk.end(); i != e; ++i){
                     if(replay){
-                        i = blk.begin();
-                        replay = false;
-                    }
+                         i = blk.begin(); 
+                            replay = true;
+                        }
+
                     Instruction *ii= dyn_cast<Instruction>(i);
 
                     Value *v;

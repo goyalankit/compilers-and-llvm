@@ -67,18 +67,15 @@ namespace {
 
 
         Value * varConVar(Instruction &i, ConstantInt* zeroOne){
-            Value *operand1 = i.getOperand(0);
-            Value *operand2 = i.getOperand(1);
-            if (cast<Instruction>(operand1)->isIdenticalTo(cast<Instruction>(operand2))) {
-                return zeroOne;
-            }
+            if(i.getNumOperands() != 2 ) return NULL;
+            if(i.getOperand(0) == i.getOperand(1)) return zeroOne;
             return NULL;
         }
 
     //TODO Refactor this thing!
     template<typename APType, typename ConstantType>
         Value * algIdentityMD(Instruction &i, APType generalZeroOne, int operation, int identity){ //0: Multiplication. 1 Division
-            errs() << i << "\n";
+            //errs() << i << "\n";
             Value *operand1 = i.getOperand(0);
             Value *operand2 = i.getOperand(1);
             /* ConstantInt and ConstantFP. http://llvm.org/docs/doxygen/html/Constants_8h.html */
@@ -262,11 +259,11 @@ namespace {
 
                                                    ConstantInt * one = ConstantInt::get(intype->getContext(), getZeroOne<APInt>(intype->getBitWidth(),1));
 
-                                                   //      if(v = varConVar(*ii, one)) { 
-                                                   //          makeTheChanges(i, v); 
-                                                   //         ++NumXForms;
-                                                   //         continue;
-                                                   //     }
+                                                         if(v = varConVar(*ii, one)) { 
+                                                             makeTheChanges(i, v); 
+                                                            ++NumXForms;
+                                                            continue;
+                                                        }
 
                                                    if(v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),1),1,1))// X / 1 = X; OP=1 ID=1
                                                    {
@@ -322,7 +319,7 @@ namespace {
             }
 
             virtual bool runOnFunction(Function &func){
-                errs() << "Function: " << func.getName() << "\n";
+                //errs() << "Function: " << func.getName() << "\n";
                 for (Function::iterator i = func.begin(), e = func.end(); i != e; ++i){ //iterating over the basic blocks                    
                     runOnBasicBlock(*i);
                     //print_basic_block_info(*i);

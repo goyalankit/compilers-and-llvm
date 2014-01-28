@@ -15,6 +15,7 @@ Low level: Use of a **control flow graph**(CFG).
 		-- Edges represent explicit flow of control.
 
 Source code
+```
 1  a := 0				 ;start of block
 2  b := a * b    ;end of block
 3  L1: c := b/d  ;Entry point, start of block
@@ -25,7 +26,9 @@ Source code
 8  h := t - g    
 9  if e > 0 goto L3  ;Exit Point, end of block
 10 goto L1           ;Exit point, end of block
-11 L3: return        ;Entry point, start and end of block**Basic Blocks**: A sequence of straight line code that can be entered only at the beginning and exited only at the end.
+11 L3: return        ;Entry point, start and end of block
+```
+**Basic Blocks**: A sequence of straight line code that can be entered only at the beginning and exited only at the end.
 
 **Extended basic blocks**: A maximal sequence of instructions that has no merge points in it.(except perhaps in the leader)
 		- Single entry multiple exits.

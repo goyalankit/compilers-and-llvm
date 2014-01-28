@@ -206,7 +206,7 @@ namespace {
                 for (BasicBlock::iterator i = blk.begin(), e = blk.end(); i != e; ++i){
                     if(replay){
                         i = blk.begin(); 
-                        replay = true;
+                        replay = false;
                     }
 
                     Instruction *ii= dyn_cast<Instruction>(i);
@@ -261,14 +261,14 @@ namespace {
                         case Instruction::SDiv:{
 
                                                    ConstantInt * one = ConstantInt::get(intype->getContext(), getZeroOne<APInt>(intype->getBitWidth(),1));
-                                                   
-                                                   if(v = varConVar(*ii, one)) { 
-                                                       makeTheChanges(i, v); 
-                                                       ++NumXForms;
-                                                       continue;
-                                                   }
 
-                                                   else if(v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),1),1,1))// X / 1 = X; OP=1 ID=1
+                                                   //      if(v = varConVar(*ii, one)) { 
+                                                   //          makeTheChanges(i, v); 
+                                                   //         ++NumXForms;
+                                                   //         continue;
+                                                   //     }
+
+                                                   if(v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),1),1,1))// X / 1 = X; OP=1 ID=1
                                                    {
                                                        makeTheChanges(i, v); 
                                                        ++NumXForms;

@@ -52,7 +52,6 @@ namespace {
             /* Constant types */            
             ConstantType *cint; 
 
-            //check for X-X case. Only checked for subtraction. Check if the variables are identical.
 
             if(cint = dyn_cast<ConstantType>(operand2)){
                 if(id_compare<ConstantType, APType>(*cint, generalZeroOne))
@@ -66,11 +65,13 @@ namespace {
         }
 
 
-        Value * varConVar(Instruction &i, ConstantInt* zeroOne){
-            if(i.getNumOperands() != 2 ) return NULL;
-            if(i.getOperand(0) == i.getOperand(1)) return zeroOne;
-            return NULL;
-        }
+
+    //check for X-X and X/X case. Check if the variables are identical.
+    Value * varConVar(Instruction &i, ConstantInt* zeroOne){
+        if(i.getNumOperands() != 2 ) return NULL;
+        if(i.getOperand(0) == i.getOperand(1)) return zeroOne;
+        return NULL;
+    }
 
     //TODO Refactor this thing!
     template<typename APType, typename ConstantType>
@@ -106,7 +107,7 @@ namespace {
                            break;
                        }
                 case 1:{ //division
-                           
+
                            if(identity == 0){
                                if(cint = dyn_cast<ConstantType>(operand1)){ //operand 1 is 0 and it's division 0 / X = 0
                                    if(id_compare<ConstantType, APType>(*cint, generalZeroOne))
@@ -223,7 +224,7 @@ namespace {
 
                             break; //X+0 = 0+X = X  
                         case Instruction::Sub: {
-                                                    //check for x-x thing
+                                                   //check for x-x thing
                                                    ConstantInt * zero = ConstantInt::get(intype->getContext(), getZeroOne<APInt>(intype->getBitWidth(),0));
                                                    if(v = varConVar(*ii, zero)) { 
                                                        makeTheChanges(i, v); 
@@ -236,10 +237,10 @@ namespace {
                                                        ++NumXForms;
                                                        continue;
                                                    }
-                            break; //X-0 = X;
+                                                   break; //X-0 = X;
                                                }
                         case Instruction::Mul:{
-                                                   //X * 1 = X , 1 * X = X; operation = 0 identity = 1
+                                                  //X * 1 = X , 1 * X = X; operation = 0 identity = 1
                                                   if(v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),1), 0, 1)) { 
                                                       makeTheChanges(i, v); 
                                                       ++NumXForms;
@@ -259,13 +260,13 @@ namespace {
 
                                                    ConstantInt * one = ConstantInt::get(intype->getContext(), getZeroOne<APInt>(intype->getBitWidth(),1));
 
-                                                         if(v = varConVar(*ii, one)) { 
-                                                             makeTheChanges(i, v); 
-                                                            ++NumXForms;
-                                                            continue;
-                                                        }
+                                                   if(v = varConVar(*ii, one)) { 
+                                                       makeTheChanges(i, v); 
+                                                       ++NumXForms;
+                                                       continue;
+                                                   }
 
-                                                   if(v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),1),1,1))// X / 1 = X; OP=1 ID=1
+                                                   else if(v = algIdentityMD<APInt, ConstantInt>(*ii, getZeroOne<APInt>(intype->getBitWidth(),1),1,1))// X / 1 = X; OP=1 ID=1
                                                    {
                                                        makeTheChanges(i, v); 
                                                        ++NumXForms;

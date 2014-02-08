@@ -17,7 +17,7 @@
 #include "llvm/DebugInfo.h"
 #include "llvm/Assembly/AssemblyAnnotationWriter.h"
 
-#include "dataflow.cpp"
+#include "dataflow.h"
 
 #include <ostream>
 #include <fstream>
@@ -28,23 +28,43 @@ using namespace llvm;
 
 namespace {
 
-
-
-    class Live : public FunctionPass, public DataFlow<true, BitVector*>{
+    class Live : public FunctionPass, public DataFlow<BitVector>{
 
         public:
             static char ID;
-            Live() : FunctionPass(ID) {}
 
+            /* set forward false in the constructor for liveness */
+            Live() : DataFlow<BitVector>(false), FunctionPass(ID) {
+            }
+
+////////////////////////////////////////////////////////////////////////////////
+
+            /* implement methods from the framework */
+            
+            virtual void setBoundaryCondition(BitVector*) {
+                errs() << "set boundary condition called";
+            }
+
+            virtual void meetOp(BitVector* lhs, const BitVector* rhs){
+            }
+
+            virtual BitVector* initializeFlowValue(BasicBlock& b){ 
+                return NULL;
+            }
+
+            virtual BitVector* transferFn(BasicBlock& b) {
+                return NULL;
+            }
+
+///////////////////////////////////////////////////////////////////////////////
 
             virtual bool runOnFunction(Function &F) {
                 for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I){
                     Instruction &II = *I;
-                    errs() << *I;
+                    errs() << *I << "\n";
+                    DataFlow<BitVector>::runOnFunction();
                 }
                 return false;
-
-
             }
 
             virtual void getAnalysisUsage(AnalysisUsage &AU) const {

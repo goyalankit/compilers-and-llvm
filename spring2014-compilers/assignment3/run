@@ -1,0 +1,11 @@
+#!/bin/bash
+
+filename=$(basename "$1")
+extension="${filename##*.}"
+filename="${filename%.*}"
+
+clang -O0 -emit-llvm -c $1
+opt -load ./live.so -live $filename.bc -o $filename-out.bc
+
+#llvm-dis $filename-simp.bc
+#llvm-dis $filename-out.bc

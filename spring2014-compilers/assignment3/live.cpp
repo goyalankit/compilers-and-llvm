@@ -57,9 +57,12 @@ namespace {
 
             /* domain variable. [all the definitions and function arguments in case of liveness] */
             std::vector<Value*> domain;
+            ValueMap<Value*, BitVector*> domainIndexToBitVector;
+            ValueMap<Value*, int> valueToBitVectorIndex;
+
             int domainSize;
             int numArgs;
-    
+            int numInstr;
 /*-----------------------------------implement framework methods-----------------------------------*/
             
             //set the boundary condition for block. exit block in this case.
@@ -79,9 +82,21 @@ namespace {
             virtual BitVector* initializeFlowValue(BasicBlock& b, SetType setType){ 
                 return new BitVector(domainSize, false); 
             }
+             
+            //transfer function:
+            //IN[n] = USE[n] U (OUT[n] - DEF[n]) //transfer function
+            virtual BitVector* transferFn(BasicBlock& blk) {
+                BitVector *blkout = new BitVector((*out)[blk]); //block out: OUT[n]
+//                valueToBitVectorIndex
+                Instruction *instruction;
+                for (BasicBlock::iterator e = --(blk.end()), i = blk.begin; i == e; --e){
+                    instruction = &*e; //last instruction
+  //                  (*in)[&blk] =   //out of previous = in
+    //                if(isa<Instruction> )
+                }
 
-            virtual BitVector* transferFn(BasicBlock& b) {
-                return NULL;
+
+                return new BitVector(domainSize, false);
             }
 
 /*------------------------------------------------------------------------------------------------*/
@@ -102,14 +117,18 @@ namespace {
 
             virtual bool runOnFunction(Function &F) {
                 domain.clear();
-                numArgs = 0;
+                int index = 0;
                 for (Function::arg_iterator arg = F.arg_begin(); arg != F.arg_end(); ++arg){
-                    numArgs++;
                     domain.push_back(arg);
+                    valueToBitVectorIndex[arg] = index;
+                    index++;
                 }
                 for (inst_iterator instruction = inst_begin(F), e = inst_end(F); instruction != e; ++instruction) {
-                    if (isDefinition(&*instruction))
+                    if (isDefinition(&*instruction)){
                         domain.push_back(&*instruction);
+                        valueToBitVectorIndex[instruction] = index;
+                        index++;
+                    }
                 }
                 
                 domainSize = domain.size();

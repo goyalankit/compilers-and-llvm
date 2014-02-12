@@ -44,7 +44,6 @@ namespace {
                 in  = new BlockInOutMap();
                 out = new BlockInOutMap();
                 neighbourSpecificValues = new BlockInOutMap();
-                previousState = new ValueMap<BasicBlock*, int>();
             }   
 
             //mapping from basicblock to lattice
@@ -53,7 +52,6 @@ namespace {
             BlockInOutMap *in;
             BlockInOutMap *out;
             BlockInOutMap *neighbourSpecificValues;
-            ValueMap<BasicBlock*, int> *previousState;
 
             void performBackwardAnalysis(Worklist &w){
                 BasicBlock *hotBlock = *w.begin();
@@ -61,21 +59,12 @@ namespace {
                 //out of this basic block is equivalent to in of it's successor
                 //OUT = Union IN
                 int numSucc = 0; //to check for the exit node
-                
-                //DEBUG
-                //errs() << "Entering in the block: " << hotBlock->getName() << "\n";
-                
+
                 for (succ_iterator SI = succ_begin(hotBlock), E = succ_end(hotBlock); SI != E; ++SI) {
-
-                    if(hotBlock->getName() == "entry"){
-                        errs() << "*********** In Set for Entry " << SI->getName() << "\n";
-                        printBV((*in)[*SI]);
-                    }
-
                     numSucc++;
                     if(SI == succ_begin(hotBlock)){
                         //call the copy constructor on first block
-                        (*out)[hotBlock] = (*in)[*SI];
+                        *(*out)[hotBlock] = *(*in)[*SI];
                         continue;
                     }else{
                         //call the meet operator                        
@@ -83,33 +72,23 @@ namespace {
                     }
                 }
 
-
-
                 if((*neighbourSpecificValues).find(hotBlock) != (*neighbourSpecificValues).end() ){
-                        errs() << "::::::::::::::Neighbourhood Specific Values:::::::" << hotBlock->getName() << "\n";
-                        printBV((*neighbourSpecificValues)[hotBlock]);
-                        meetOp((*out)[hotBlock], (*neighbourSpecificValues)[hotBlock]);
+                    meetOp((*out)[hotBlock], (*neighbourSpecificValues)[hotBlock]);
                 }
 
                 if(numSucc == 0) setBoundaryCondition((*out)[hotBlock]); //set boundary condition for the exit node.
 
                 FlowValueType *newIn = transferFn(*hotBlock);
-                    
-
 
                 if(*newIn != *(*in)[hotBlock] ){
                     *(*in)[hotBlock] = *newIn;
-                    if(hotBlock->getName() == "for.cond"){
-                        errs() << "In condition for for.cond::::";
-                        printBV((*in)[hotBlock]);
-                    }
                     for (pred_iterator PI = pred_begin(hotBlock), E = pred_end(hotBlock); PI != E; ++PI) {
                         w.push_back(*PI); 
                     } 
                 }
             }
 
-
+            //add just the last block in case of backward analysis
             void initializeWorklist(Function &func, Worklist &worklist){
                 for (Function::iterator i = func.begin(), e = func.end(); i != e; ++i){
                     int numSucc = 0;
@@ -154,9 +133,7 @@ namespace {
         };
 
 
-    
+
 }
 
 #endif
-
-//#include "dataflow.cpp"

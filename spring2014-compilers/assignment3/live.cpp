@@ -108,10 +108,6 @@ namespace {
             
             virtual BitVector* transferFn(BasicBlock& bb) {
                 BitVector* next = new BitVector(*((*out)[&bb]));
- //               errs() << "----------------"<< bb.getName() <<"---------------\n";
-     //           printBV(next);
-   //             errs() << "-----------------------------------\n";
-                 
                                    
                 BitVector* instVec = next; // for empty blocks
                 Instruction* inst;

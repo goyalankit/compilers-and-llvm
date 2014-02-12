@@ -128,9 +128,9 @@ namespace {
             //IN[n] = USE[n] U (OUT[n] - DEF[n]) //transfer function
             
             virtual BitVector* transferFn(BasicBlock& bb) {
-                BitVector* next = new BitVector(*((*out)[&bb]));
+                BitVector* outNowIn = new BitVector(*((*out)[&bb]));
                                    
-                BitVector* instVec = next; // for empty blocks
+                BitVector* instVec = outNowIn; // for empty blocks
                 Instruction* inst;
                 bool breakme=false;
                 // go through instructions in reverse
@@ -140,7 +140,7 @@ namespace {
                     // inherit data from next instruction
                     inst = &*ii;
                     instVec = (*instrInSet)[inst];            
-                    *instVec = *next;
+                    *instVec = *outNowIn;
 
                     // if this instruction is a new definition, remove it
                     if (isDefinition(inst)){
@@ -169,7 +169,7 @@ namespace {
                         }
                     }
 
-                    next = instVec;
+                    outNowIn = instVec;
 
                     if (ii == ib) break;
 

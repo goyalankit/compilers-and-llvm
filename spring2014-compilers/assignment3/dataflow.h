@@ -15,6 +15,7 @@
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/ValueMap.h"
 #include "llvm/Support/CFG.h"
+#include "llvm/ADT/DenseMap.h"
 
 #include <ostream>
 #include <list>
@@ -42,6 +43,8 @@ namespace {
                 this->forward = forward;  
                 in  = new BlockInOutMap();
                 out = new BlockInOutMap();
+                neighbourSpecificValues = new BlockInOutMap();
+                previousState = new ValueMap<BasicBlock*, int>();
             }   
 
             //mapping from basicblock to lattice
@@ -49,7 +52,9 @@ namespace {
             //In out sets for a basic block
             BlockInOutMap *in;
             BlockInOutMap *out;
-            
+            BlockInOutMap *neighbourSpecificValues;
+            ValueMap<BasicBlock*, int> *previousState;
+
             void performBackwardAnalysis(Worklist &w){
                 BasicBlock *hotBlock = *w.begin();
                 w.pop_front();
@@ -57,24 +62,47 @@ namespace {
                 //OUT = Union IN
                 int numSucc = 0; //to check for the exit node
                 
+                //DEBUG
+                //errs() << "Entering in the block: " << hotBlock->getName() << "\n";
+                
                 for (succ_iterator SI = succ_begin(hotBlock), E = succ_end(hotBlock); SI != E; ++SI) {
+
+                    if(hotBlock->getName() == "entry"){
+                        errs() << "*********** In Set for Entry " << SI->getName() << "\n";
+                        printBV((*in)[*SI]);
+                    }
+
                     numSucc++;
                     if(SI == succ_begin(hotBlock)){
                         //call the copy constructor on first block
                         (*out)[hotBlock] = (*in)[*SI];
                         continue;
                     }else{
-                        //call the meet operator
+                        //call the meet operator                        
                         meetOp((*out)[hotBlock], (*in)[*SI]);
                     }
+                }
+
+
+
+                if((*neighbourSpecificValues).find(hotBlock) != (*neighbourSpecificValues).end() ){
+                        errs() << "::::::::::::::Neighbourhood Specific Values:::::::" << hotBlock->getName() << "\n";
+                        printBV((*neighbourSpecificValues)[hotBlock]);
+                        meetOp((*out)[hotBlock], (*neighbourSpecificValues)[hotBlock]);
                 }
 
                 if(numSucc == 0) setBoundaryCondition((*out)[hotBlock]); //set boundary condition for the exit node.
 
                 FlowValueType *newIn = transferFn(*hotBlock);
+                    
+
+
                 if(*newIn != *(*in)[hotBlock] ){
                     *(*in)[hotBlock] = *newIn;
-
+                    if(hotBlock->getName() == "for.cond"){
+                        errs() << "In condition for for.cond::::";
+                        printBV((*in)[hotBlock]);
+                    }
                     for (pred_iterator PI = pred_begin(hotBlock), E = pred_end(hotBlock); PI != E; ++PI) {
                         w.push_back(*PI); 
                     } 
@@ -83,12 +111,14 @@ namespace {
 
 
             void initializeWorklist(Function &func, Worklist &worklist){
-                /*insert all the block at first*/
                 for (Function::iterator i = func.begin(), e = func.end(); i != e; ++i){
-                    BasicBlock *bb = &*i;
-                    worklist.push_back(bb);
+                    int numSucc = 0;
+                    for (succ_iterator SI = succ_begin(&*i), SE = succ_end(&*i); SI != SE; SI++) {
+                        numSucc++;
+                    }
+                    if(numSucc==0)
+                        worklist.push_back(&*i);
                 }
-                if(forward) worklist.reverse();
             }
 
             bool runOnFunction(Function &F){
@@ -105,7 +135,8 @@ namespace {
 
                 Worklist *worklist = new Worklist();
                 initializeWorklist(F,*worklist);
-                performBackwardAnalysis(*worklist);
+                while(!worklist->empty())
+                    performBackwardAnalysis(*worklist);
             }
 
 
@@ -119,6 +150,7 @@ namespace {
             virtual FlowValueType* initializeFlowValue(BasicBlock& b, SetType setType) = 0;
             //transer function
             virtual FlowValueType* transferFn(BasicBlock& b) = 0;
+            virtual void printBV(const FlowValueType*) = 0;
         };
 
 

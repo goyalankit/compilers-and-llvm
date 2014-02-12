@@ -118,8 +118,6 @@ namespace {
                     performBackwardAnalysis(*worklist);
             }
 
-
-
             protected:
             //get the boundary conditions for entry nodes
             virtual void setBoundaryCondition(FlowValueType*) = 0;
@@ -130,9 +128,6 @@ namespace {
             //transer function
             virtual FlowValueType* transferFn(BasicBlock& b) = 0;
         };
-
-
-
 }
 
 #endif

@@ -50,9 +50,6 @@ using namespace llvm;
 
 namespace {
 
-
-
-
     class Live : public FunctionPass, public DataFlow<BitVector>, public AssemblyAnnotationWriter{
 
         public:
@@ -76,15 +73,6 @@ namespace {
             int numInstr;
 
             /*----------------------------------------implement display methods--------------------------------*/
-
-           void printBV(const BitVector *bv) {
-                for (int i=0; i < bv->size(); i++) {
-                    if ( (*bv)[i] ) {
-                        WriteAsOperand(errs(), (*bvIndexToInstrArg)[i], false);
-                    }
-                }
-            }
-
 
             virtual void emitBasicBlockStartAnnot(const BasicBlock *bb, formatted_raw_ostream &os) {
                 os << "; ";
@@ -114,12 +102,6 @@ namespace {
                 }
                 os << "\n";
             }
-
-
-
-
-
-
 
             /*-----------------------------------implement framework methods-----------------------------------*/
 
@@ -205,46 +187,7 @@ namespace {
             /*-------------------------------------------------------------------------------------------------*/
 
 
-            void displayResults(Function &F) {
-                // iterate over basic blocks
-                Function::iterator bi = F.begin(), be = (F.end());
-                for (; bi != be; ) {            
-                    printBV( (*in)[&*bi] ); // entry node
-                    errs() << bi->getName() << ":\n"; //Display labels for basic blocks
-
-                    // iterate over remaining instructions except very first one
-                    BasicBlock::iterator ii = bi->begin(), ie = (bi->end());
-                   // errs() << "\t" << *ii << "\n";
-                    for (ii++; ii != ie; ii++) {
-                        if (!isa<PHINode>(*(ii))) {
-                            printBV( (*instrInSet)[&*ii] );
-                        }
-                        errs() << "\t" << *ii << "\n";
-                    }
-
-                    // display in[bb]
-                    ++bi;
-
-                    if (bi != be && !isa<PHINode>(*((bi)->begin())))
-                        printBV( (*out)[&*bi] );
-
-                    errs() << "\n";
-                }
-                printBV( (*out)[&*(--bi)] );
-            }
-
-
             /*------------------------------------------------------------------------------------------------*/
-
-            //check if the instruction is a definition
-            void printDomain(std::vector<Value*> domain){
-                errs() << "------------\n";
-                for(int i=0; i< domain.size(); i++){
-                    errs() << domain[i]->getName() << "    ";
-                    errs() << *domain[i] << "\n";
-                }
-                errs() << "-------------";
-            }
 
             virtual bool runOnFunction(Function &F) {
                 domain.clear();
@@ -257,18 +200,13 @@ namespace {
                 }
 
                 for (inst_iterator instruction = inst_begin(F), e = inst_end(F); instruction != e; ++instruction) {
-                    //if (isDefinition(&*instruction)){
                     domain.push_back(&*instruction);
                     bvIndexToInstrArg->push_back(&*instruction);
                     (*valueToBitVectorIndex)[&*instruction] = index;
                     index++;
-                    //}
                 }
 
                 domainSize = domain.size();
-
-                //DEBUG: printing all args and variables.     
-                // printDomain(domain);
 
                 //initialize the IN set set inside the block for each instruction.     
                 for (inst_iterator instruction = inst_begin(F), e = inst_end(F); instruction != e; ++instruction) {
@@ -277,7 +215,6 @@ namespace {
 
                 DataFlow<BitVector>::runOnFunction(F); //call the analysis method in dataflow
                 F.print(errs(), this);
-        //        displayResults(F);
                 return false; //not changing anything
             }
 

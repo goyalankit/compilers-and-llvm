@@ -130,7 +130,7 @@ namespace {
             virtual BitVector* transferFn(BasicBlock& bb) {
                 BitVector* outNowIn = new BitVector(*((*out)[&bb]));
                                    
-                BitVector* instVec = outNowIn; // for empty blocks
+                BitVector* immIn = outNowIn; // for empty blocks
                 Instruction* inst;
                 bool breakme=false;
                 // go through instructions in reverse
@@ -139,12 +139,12 @@ namespace {
 
                     // inherit data from next instruction
                     inst = &*ii;
-                    instVec = (*instrInSet)[inst];            
-                    *instVec = *outNowIn;
+                    immIn = (*instrInSet)[inst];            
+                    *immIn = *outNowIn;
 
                     // if this instruction is a new definition, remove it
                     if (isDefinition(inst)){
-                        (*instVec)[(*valueToBitVectorIndex)[inst]] = false;
+                        (*immIn)[(*valueToBitVectorIndex)[inst]] = false;
                     }
 
                     // add the arguments, unless it is a phi node
@@ -152,7 +152,7 @@ namespace {
                         User::op_iterator OI, OE;
                         for (OI = inst->op_begin(), OE=inst->op_end(); OI != OE; ++OI) {
                             if (isa<Instruction>(*OI) || isa<Argument>(*OI)) {
-                                (*instVec)[(*valueToBitVectorIndex)[*OI]] = true;
+                                (*immIn)[(*valueToBitVectorIndex)[*OI]] = true;
                             }
                         }
                     }else if(isa<PHINode>(*ii)){
@@ -169,14 +169,14 @@ namespace {
                         }
                     }
 
-                    outNowIn = instVec;
+                    outNowIn = immIn;
 
                     if (ii == ib) break;
 
                     --ii;
                 }
 
-                return instVec;
+                return immIn;
             }
 
             bool isDefinition(Instruction *ii) {

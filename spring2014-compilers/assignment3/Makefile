@@ -1,4 +1,4 @@
-all:  live.so
+all:  live.so reach.so
 
 CXXFLAGS = -rdynamic $(shell llvm-config --cxxflags) -g -O0
 

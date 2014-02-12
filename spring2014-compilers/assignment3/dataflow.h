@@ -53,6 +53,15 @@ namespace {
             BlockInOutMap *out;
             BlockInOutMap *neighbourSpecificValues;
 
+            void performForwardAnalysis(Worklist &w){
+                BasicBlock *hotBlock = *w.begin();
+                w.pop_front();
+
+                for (pred_iterator PI = pred_begin(hotBlock), E = pred_end(hotBlock); PI != E; ++PI){
+                    
+                }
+            }
+
             void performBackwardAnalysis(Worklist &w){
                 BasicBlock *hotBlock = *w.begin();
                 w.pop_front();
@@ -90,6 +99,11 @@ namespace {
 
             //add just the last block in case of backward analysis
             void initializeWorklist(Function &func, Worklist &worklist){
+                if(forward){
+                    BasicBlock& entry = func.getEntryBlock();
+                    worklist.push_back(&entry);
+                    return;
+                }
                 for (Function::iterator i = func.begin(), e = func.end(); i != e; ++i){
                     int numSucc = 0;
                     for (succ_iterator SI = succ_begin(&*i), SE = succ_end(&*i); SI != SE; SI++) {
@@ -101,8 +115,6 @@ namespace {
             }
 
             bool runOnFunction(Function &F){
-                BasicBlock& blockBoundary = F.getEntryBlock();
-
                 for (Function::iterator bi = F.begin(), be = F.end(); bi != be; bi++) {
                     BasicBlock * bb = &*bi;
 
@@ -114,8 +126,12 @@ namespace {
 
                 Worklist *worklist = new Worklist();
                 initializeWorklist(F,*worklist);
-                while(!worklist->empty())
-                    performBackwardAnalysis(*worklist);
+                while(!worklist->empty()){
+                    if(forward)
+                        performForwardAnalysis(*worklist);
+                    else
+                        performBackwardAnalysis(*worklist);
+                }
             }
 
             protected:

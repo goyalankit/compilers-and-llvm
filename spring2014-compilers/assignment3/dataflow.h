@@ -47,7 +47,7 @@ namespace {
             }   
 
             //mapping from basicblock to lattice
-            typedef ValueMap<BasicBlock*, FlowValueType*> BlockInOutMap;    
+            typedef ValueMap<const BasicBlock*, FlowValueType*> BlockInOutMap;    
             //In out sets for a basic block
             BlockInOutMap *in;
             BlockInOutMap *out;
@@ -129,7 +129,6 @@ namespace {
             virtual FlowValueType* initializeFlowValue(BasicBlock& b, SetType setType) = 0;
             //transer function
             virtual FlowValueType* transferFn(BasicBlock& b) = 0;
-            virtual void printBV(const FlowValueType*) = 0;
         };
 
 

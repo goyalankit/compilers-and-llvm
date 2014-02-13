@@ -44,7 +44,7 @@ namespace {
                 in  = new BlockInOutMap();
                 out = new BlockInOutMap();
                 neighbourSpecificValues = new BlockInOutMap();
-            }   
+            }
 
             //mapping from basicblock to lattice
             typedef ValueMap<const BasicBlock*, FlowValueType*> BlockInOutMap;    
@@ -56,9 +56,28 @@ namespace {
             void performForwardAnalysis(Worklist &w){
                 BasicBlock *hotBlock = *w.begin();
                 w.pop_front();
-
+                //DEBUG::
+                errs() << "Entring Block " << hotBlock->getName() << "\n";
+                int numPred = 0;
                 for (pred_iterator PI = pred_begin(hotBlock), E = pred_end(hotBlock); PI != E; ++PI){
-                    
+                    ++numPred;
+                    if(PI == pred_begin(hotBlock)){
+                        *(*in)[hotBlock] = *(*out)[*PI];
+                    }else{
+                        meetOp((*in)[hotBlock], (*out)[*PI]);
+                    }
+                }
+
+                if(numPred == 0)  setBoundaryCondition((*in)[hotBlock]);
+
+                FlowValueType *newOut = transferFn(*hotBlock);
+
+                if(*newOut != *(*out)[hotBlock] ){
+                    *(*out)[hotBlock] = *newOut;
+                    for (succ_iterator SI = succ_begin(hotBlock), E = succ_end(hotBlock); SI != E; ++SI) {
+                        //TODO: Don't add to worklist if the block is already present
+                        w.push_back(*SI); 
+                    } 
                 }
             }
 
@@ -72,16 +91,14 @@ namespace {
                 for (succ_iterator SI = succ_begin(hotBlock), E = succ_end(hotBlock); SI != E; ++SI) {
                     numSucc++;
                     if(SI == succ_begin(hotBlock)){
-                        //call the copy constructor on first block
-                        *(*out)[hotBlock] = *(*in)[*SI];
-                        continue;
+                        *(*out)[hotBlock] = *(*in)[*SI]; //copy the first IN set values
                     }else{
-                        //call the meet operator                        
-                        meetOp((*out)[hotBlock], (*in)[*SI]);
+                        meetOp((*out)[hotBlock], (*in)[*SI]); //call the meet operator                        
                     }
                 }
 
                 if((*neighbourSpecificValues).find(hotBlock) != (*neighbourSpecificValues).end() ){
+                    //for phi node. meet the variables that are live from this specific block
                     meetOp((*out)[hotBlock], (*neighbourSpecificValues)[hotBlock]);
                 }
 
@@ -92,6 +109,7 @@ namespace {
                 if(*newIn != *(*in)[hotBlock] ){
                     *(*in)[hotBlock] = *newIn;
                     for (pred_iterator PI = pred_begin(hotBlock), E = pred_end(hotBlock); PI != E; ++PI) {
+                        //TODO: Don't add to worklist if the block is already present
                         w.push_back(*PI); 
                     } 
                 }
@@ -104,13 +122,14 @@ namespace {
                     worklist.push_back(&entry);
                     return;
                 }
+
                 for (Function::iterator i = func.begin(), e = func.end(); i != e; ++i){
                     int numSucc = 0;
-                    for (succ_iterator SI = succ_begin(&*i), SE = succ_end(&*i); SI != SE; SI++) {
+
+                    for (succ_iterator SI = succ_begin(&*i), SE = succ_end(&*i); SI != SE; SI++)
                         numSucc++;
-                    }
-                    if(numSucc==0)
-                        worklist.push_back(&*i);
+
+                    if(numSucc==0) worklist.push_back(&*i);
                 }
             }
 

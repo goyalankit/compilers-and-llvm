@@ -36,4 +36,3 @@ for.end:                                          ; preds = %for.cond
 ; %res.0, 
   ret i32 %res.0
 }
-Destructing objects

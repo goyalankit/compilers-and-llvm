@@ -116,7 +116,7 @@ namespace {
                 *lhs |= *rhs; 
             }
 
-            //empty set initially. 
+            //empty set initially. for both IN and OUT
             virtual BitVector* initializeFlowValue(BasicBlock& b, SetType setType){ 
                 return new BitVector(domainSize, false); 
             }
@@ -125,39 +125,32 @@ namespace {
             //transfer function:
             //out[n] = gen[n] ∪ (in[n] – kill[n])
 
-
             virtual BitVector* transferFn(BasicBlock& bb) {
                 BitVector* outNowIn = new BitVector(*((*in)[&bb]));
                                    
                 BitVector* immOut = outNowIn; // for empty blocks
-                Instruction* inst;
-                bool breakme=false;
-                // go through instructions in reverse
-
+                
+                //go through instructions in forward direction
                 for (BasicBlock::iterator ii = bb.begin(), ie = bb.end(); ii != ie; ii++) {
                     // inherit data from next instruction
-                    inst = &*ii;
-                    immOut = (*instrInSet)[inst];            
+                    immOut = (*instrInSet)[&*ii];            
                     *immOut = *outNowIn;
 
                     // definition generates reachingness
-                    if (isDefinition(inst)){
-                        (*immOut)[(*valueToBitVectorIndex)[inst]] = true;
+                    if (isDefinition(&*ii)){
+                        (*immOut)[(*valueToBitVectorIndex)[&*ii]] = true;
                     }
 
-                    // add the arguments, unless it is a phi node
-                    if (!isa<PHINode>(*ii)) {
-                        User::op_iterator OI, OE;
-                        for (OI = inst->op_begin(), OE=inst->op_end(); OI != OE; ++OI) {
-                            if (isa<Instruction>(*OI) || isa<Argument>(*OI)) {
-                                (*immOut)[(*valueToBitVectorIndex)[*OI]] = true;
-                            }
-                        }
-                    }else if(isa<PHINode>(*ii)){
+                    //TODO: think about what to do with phi instructions. Variables that are getting used are kind of getting redefined. 
+                    // x2 = phi(x1, x0). In strict sense x is getting re-defined. phi function is merging two reaching definitions. 
+                    
+                    if(isa<PHINode>(*ii)){
+                    //    errs() << "Phi instruction says hi, i look like " << *ii << "\n";
                         PHINode* phiNode = cast<PHINode>(&*ii);
                         for (int incomingIdx = 0; incomingIdx < phiNode->getNumIncomingValues(); incomingIdx++) {
                             Value* val = phiNode->getIncomingValue(incomingIdx);
                             if (isa<Instruction>(val) || isa<Argument>(val)) {
+                      //          errs() << val->getName() << " gotta go!\n";
                                 (*immOut)[(*valueToBitVectorIndex)[val]] = false;
                             }
                         }
@@ -165,12 +158,10 @@ namespace {
 
                     outNowIn = immOut;
                 }
-
+            
+                //return a new copy
                 return new BitVector(*immOut);
             }
-
-
-
 
             bool isDefinition(Instruction *ii) {
                 return !(isa<TerminatorInst>(ii)) ;

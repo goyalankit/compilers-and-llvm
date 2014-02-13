@@ -1,0 +1,38 @@
+
+; Function Attrs: nounwind
+define i32 @sum(i32 %a, i32 %b) #0 {
+entry:
+; %a, %b, 
+; %a, %b, 
+  br label %for.cond
+
+for.cond:                                         ; preds = %for.inc, %entry
+; %a, %b, %i.0, %res.0, %cmp, %mul, %inc, 
+; 
+  %i.0 = phi i32 [ %a, %entry ], [ %inc, %for.inc ]
+; 
+  %res.0 = phi i32 [ 1, %entry ], [ %mul, %for.inc ]
+; %b, %i.0, %res.0, %cmp, 
+  %cmp = icmp slt i32 %i.0, %b
+; %b, %i.0, %res.0, %cmp, 
+  br i1 %cmp, label %for.body, label %for.end
+
+for.body:                                         ; preds = %for.cond
+; %b, %i.0, %res.0, %cmp, 
+; %b, %i.0, %res.0, %cmp, %mul, 
+  %mul = mul nsw i32 %res.0, %i.0
+; %b, %i.0, %res.0, %cmp, %mul, 
+  br label %for.inc
+
+for.inc:                                          ; preds = %for.body
+; %b, %i.0, %res.0, %cmp, %mul, 
+; %b, %i.0, %res.0, %cmp, %mul, %inc, 
+  %inc = add nsw i32 %i.0, 1
+; %b, %i.0, %res.0, %cmp, %mul, %inc, 
+  br label %for.cond
+
+for.end:                                          ; preds = %for.cond
+; %b, %i.0, %res.0, %cmp, 
+; %b, %i.0, %res.0, %cmp, 
+  ret i32 %res.0
+}

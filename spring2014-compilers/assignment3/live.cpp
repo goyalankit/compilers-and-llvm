@@ -131,26 +131,26 @@ namespace {
                 BitVector* outNowIn = new BitVector(*((*out)[&bb]));
                                    
                 BitVector* immIn = outNowIn; // for empty blocks
-                Instruction* inst;
+                Instruction* tempInst;
                 bool breakme=false;
                 // go through instructions in reverse
                 BasicBlock::iterator ii = --(bb.end()), ib = bb.begin();
                 while (true) {
 
                     // inherit data from next instruction
-                    inst = &*ii;
-                    immIn = (*instrInSet)[inst];            
+                    tempInst = &*ii;
+                    immIn = (*instrInSet)[tempInst];            
                     *immIn = *outNowIn;
 
                     // if this instruction is a new definition, remove it
-                    if (isDefinition(inst)){
-                        (*immIn)[(*valueToBitVectorIndex)[inst]] = false;
+                    if (isDefinition(tempInst)){
+                        (*immIn)[(*valueToBitVectorIndex)[tempInst]] = false;
                     }
 
                     // add the arguments, unless it is a phi node
                     if (!isa<PHINode>(*ii)) {
                         User::op_iterator OI, OE;
-                        for (OI = inst->op_begin(), OE=inst->op_end(); OI != OE; ++OI) {
+                        for (OI = tempInst->op_begin(), OE=tempInst->op_end(); OI != OE; ++OI) {
                             if (isa<Instruction>(*OI) || isa<Argument>(*OI)) {
                                 (*immIn)[(*valueToBitVectorIndex)[*OI]] = true;
                             }

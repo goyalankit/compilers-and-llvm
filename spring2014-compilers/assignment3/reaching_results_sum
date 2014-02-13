@@ -1,3 +1,9 @@
+Entring Block entry
+Entring Block for.cond
+Entring Block for.body
+Entring Block for.end
+Entring Block for.inc
+Entring Block for.cond
 
 ; Function Attrs: nounwind
 define i32 @sum(i32 %a, i32 %b) #0 {

@@ -46,6 +46,8 @@ namespace {
                 neighbourSpecificValues = new BlockInOutMap();
             }
 
+            //TODO: Destruct stuff
+            ~DataFlow(){ }
             //mapping from basicblock to lattice
             typedef ValueMap<const BasicBlock*, FlowValueType*> BlockInOutMap;    
             //In out sets for a basic block
@@ -53,6 +55,8 @@ namespace {
             BlockInOutMap *out;
             BlockInOutMap *neighbourSpecificValues;
 
+
+            //TODO: Merge forward and backward analysis methods. They are very similar.
             void performForwardAnalysis(Worklist &w){
                 BasicBlock *hotBlock = *w.begin();
                 w.pop_front();

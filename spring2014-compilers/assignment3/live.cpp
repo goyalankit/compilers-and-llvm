@@ -180,7 +180,7 @@ namespace {
             }
 
             bool isDefinition(Instruction *ii) {
-                return (!(isa<TerminatorInst>(ii) || isa<StoreInst>(ii) || (isa<CallInst>(ii) && cast<CallInst>(ii)->getCalledFunction()->getReturnType()->isVoidTy())));
+                return !(isa<TerminatorInst>(ii)) ;
             }
 
 

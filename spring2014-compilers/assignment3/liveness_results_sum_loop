@@ -19,7 +19,7 @@ if.else:                                          ; preds = %entry
   br label %if.end
 
 if.end:                                           ; preds = %if.else, %if.then
-; 
+; %a, %b, 
 ; 
   %b.addr.0 = phi i32 [ %b, %if.then ], [ 12, %if.else ]
 ; 
@@ -28,7 +28,7 @@ if.end:                                           ; preds = %if.else, %if.then
   br label %for.cond
 
 for.cond:                                         ; preds = %for.inc, %if.end
-; %b.addr.0, 
+; %b.addr.0, %a.addr.0, %mul, %inc, 
 ; 
   %i.0 = phi i32 [ %a.addr.0, %if.end ], [ %inc, %for.inc ]
 ; 

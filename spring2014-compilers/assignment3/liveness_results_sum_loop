@@ -1,0 +1,59 @@
+
+; Function Attrs: nounwind
+define i32 @sum(i32 %a, i32 %b) #0 {
+entry:
+; %a, %b, 
+; %a, %b, 
+  %cmp = icmp sgt i32 %a, 0
+; %a, %b, %cmp, 
+  br i1 %cmp, label %if.then, label %if.else
+
+if.then:                                          ; preds = %entry
+; %b, 
+; %b, 
+  br label %if.end
+
+if.else:                                          ; preds = %entry
+; %a, 
+; %a, 
+  br label %if.end
+
+if.end:                                           ; preds = %if.else, %if.then
+; 
+; 
+  %b.addr.0 = phi i32 [ %b, %if.then ], [ 12, %if.else ]
+; 
+  %a.addr.0 = phi i32 [ 23, %if.then ], [ %a, %if.else ]
+; %b.addr.0, %a.addr.0, 
+  br label %for.cond
+
+for.cond:                                         ; preds = %for.inc, %if.end
+; %b.addr.0, 
+; 
+  %i.0 = phi i32 [ %a.addr.0, %if.end ], [ %inc, %for.inc ]
+; 
+  %res.0 = phi i32 [ 1, %if.end ], [ %mul, %for.inc ]
+; %b.addr.0, %i.0, %res.0, 
+  %cmp1 = icmp slt i32 %i.0, %b.addr.0
+; %b.addr.0, %i.0, %res.0, %cmp1, 
+  br i1 %cmp1, label %for.body, label %for.end
+
+for.body:                                         ; preds = %for.cond
+; %b.addr.0, %i.0, %res.0, 
+; %b.addr.0, %i.0, %res.0, 
+  %mul = mul nsw i32 %res.0, %i.0
+; %b.addr.0, %i.0, %mul, 
+  br label %for.inc
+
+for.inc:                                          ; preds = %for.body
+; %b.addr.0, %i.0, %mul, 
+; %b.addr.0, %i.0, %mul, 
+  %inc = add nsw i32 %i.0, 1
+; %b.addr.0, %mul, %inc, 
+  br label %for.cond
+
+for.end:                                          ; preds = %for.cond
+; %res.0, 
+; %res.0, 
+  ret i32 %res.0
+}

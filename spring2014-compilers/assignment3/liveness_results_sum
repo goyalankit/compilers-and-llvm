@@ -7,7 +7,7 @@ entry:
   br label %for.cond
 
 for.cond:                                         ; preds = %for.inc, %entry
-; %b, 
+; %a, %b, %mul, %inc, 
 ; 
   %i.0 = phi i32 [ %a, %entry ], [ %inc, %for.inc ]
 ; 

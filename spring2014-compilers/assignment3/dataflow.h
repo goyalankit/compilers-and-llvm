@@ -44,24 +44,31 @@ namespace {
                 in  = new BlockInOutMap();
                 out = new BlockInOutMap();
                 neighbourSpecificValues = new BlockInOutMap();
+                visited = new ValueMap<BasicBlock*, bool>();
             }
 
             //TODO: Destruct stuff
-            ~DataFlow(){ }
+            ~DataFlow(){
+                delete in;
+                delete out;
+                delete neighbourSpecificValues;
+                delete visited;
+             }
             //mapping from basicblock to lattice
             typedef ValueMap<const BasicBlock*, FlowValueType*> BlockInOutMap;    
             //In out sets for a basic block
             BlockInOutMap *in;
             BlockInOutMap *out;
             BlockInOutMap *neighbourSpecificValues;
-
+            ValueMap<BasicBlock*, bool> *visited;
+            
 
             //TODO: Merge forward and backward analysis methods. They are very similar.
             void performForwardAnalysis(Worklist &w){
                 BasicBlock *hotBlock = *w.begin();
                 w.pop_front();
                 //DEBUG::
-                errs() << "Entring Block " << hotBlock->getName() << "\n";
+//                errs() << "Entring Block " << hotBlock->getName() << "\n";
                 int numPred = 0;
                 for (pred_iterator PI = pred_begin(hotBlock), E = pred_end(hotBlock); PI != E; ++PI){
                     ++numPred;
@@ -76,7 +83,7 @@ namespace {
 
                 FlowValueType *newOut = transferFn(*hotBlock);
 
-                if(*newOut != *(*out)[hotBlock] ){
+                if(*newOut != *(*out)[hotBlock]){
                     *(*out)[hotBlock] = *newOut;
                     for (succ_iterator SI = succ_begin(hotBlock), E = succ_end(hotBlock); SI != E; ++SI) {
                         //TODO: Don't add to worklist if the block is already present
@@ -88,6 +95,8 @@ namespace {
             void performBackwardAnalysis(Worklist &w){
                 BasicBlock *hotBlock = *w.begin();
                 w.pop_front();
+                (*visited)[hotBlock] = true;
+//                errs() << "Entring Block " << hotBlock->getName() << "\n";
                 //out of this basic block is equivalent to in of it's successor
                 //OUT = Union IN
                 int numSucc = 0; //to check for the exit node
@@ -110,12 +119,29 @@ namespace {
 
                 FlowValueType *newIn = transferFn(*hotBlock);
 
-                if(*newIn != *(*in)[hotBlock] ){
+                bool changed = false;
+                changed = ((*newIn) != (*(*in)[hotBlock]));
+
+                if(changed)
                     *(*in)[hotBlock] = *newIn;
+                    
                     for (pred_iterator PI = pred_begin(hotBlock), E = pred_end(hotBlock); PI != E; ++PI) {
-                        //TODO: Don't add to worklist if the block is already present
-                        w.push_back(*PI); 
-                    } 
+                        //make sure that each block is traversed at least one.
+                        if(changed || !(*visited)[*PI]){                            
+                            w.push_back(*PI); 
+                        } 
+                    }
+            }
+            
+            void finalizeBackwardAnalysis(Function &func){
+                for (Function::iterator i = func.begin(), e = func.end(); i != e; ++i){
+                    int numSucc = 0;
+                    BasicBlock *hotBlock = &*i;
+                    if((*neighbourSpecificValues).find(hotBlock) != (*neighbourSpecificValues).end()){
+                        for (succ_iterator SI = succ_begin(&*i), SE = succ_end(&*i); SI != SE; SI++){
+                            meetOp((*in)[*SI], (*neighbourSpecificValues)[hotBlock]);
+                        }                            
+                    }
                 }
             }
 
@@ -138,6 +164,7 @@ namespace {
             }
 
             bool runOnFunction(Function &F){
+                visited = new ValueMap<BasicBlock*,bool>();
                 for (Function::iterator bi = F.begin(), be = F.end(); bi != be; bi++) {
                     BasicBlock * bb = &*bi;
 
@@ -155,6 +182,7 @@ namespace {
                     else
                         performBackwardAnalysis(*worklist);
                 }
+                finalizeBackwardAnalysis(F);
             }
 
             protected:

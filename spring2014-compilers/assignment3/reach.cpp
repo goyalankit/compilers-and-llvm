@@ -144,7 +144,8 @@ namespace {
                     //TODO: think about what to do with phi instructions. Variables that are getting used are kind of getting redefined. 
                     // x2 = phi(x1, x0). In strict sense x is getting re-defined. phi function is merging two reaching definitions. 
                     
-                    if(isa<PHINode>(*ii)){
+                    //Asuming phi nodes don't kill the param instructions.             
+                    /*if(isa<PHINode>(*ii)){
                     //    errs() << "Phi instruction says hi, i look like " << *ii << "\n";
                         PHINode* phiNode = cast<PHINode>(&*ii);
                         for (int incomingIdx = 0; incomingIdx < phiNode->getNumIncomingValues(); incomingIdx++) {
@@ -154,7 +155,7 @@ namespace {
                                 (*immOut)[(*valueToBitVectorIndex)[val]] = false;
                             }
                         }
-                    }
+                    }*/
 
                     outNowIn = immOut;
                 }
@@ -229,6 +230,6 @@ namespace {
     //    clang -c -emit-llvm loop.c
     //    opt -load ./Live.so -live loop.bc > /dev/null
     // See http://llvm.org/releases/3.4/docs/WritingAnLLVMPass.html#running-a-pass-with-opt for more info.
-    RegisterPass<Live> X("live", "liveness pass");
+    RegisterPass<Live> X("reach", "reaching definitions pass");
 
 }

@@ -90,11 +90,11 @@ namespace {
 
             virtual void emitInstructionAnnot(const Instruction *i, formatted_raw_ostream &os) {
                 os << "; ";
+                
                 if (!isa<PHINode>(*(i))) {
                     const BitVector *bv = (*instrInSet)[&*i];
                     for (int i=0; i < bv->size(); i++) {
                         if ( (*bv)[i] ) {
-
                             WriteAsOperand(os, (*bvIndexToInstrArg)[i], false);
                             os << ", ";
                         }
@@ -105,22 +105,19 @@ namespace {
 
             /*-----------------------------------implement framework methods-----------------------------------*/
 
-            //set the boundary condition for block. exit block in this case.
-            //an empty set for all nodes in case of backward analysis.
-            //TODO check the validity
-            //call the explicit constructor. Since the bitvector has already been initialized
+            //at boundary nobody can be alive
             virtual void setBoundaryCondition(BitVector *blockBoundary) {
-                *blockBoundary = BitVector(domainSize, false); 
+                *blockBoundary = BitVector(domainSize, true); 
             }
 
-            //union aka bitwise OR. operator '|=' overriden in BitVector class
+            //take the intersection. It's a must analysis. we are removing stuff here, better be double sure.
             virtual void meetOp(BitVector* lhs, const BitVector* rhs){
-                *lhs |= *rhs; 
+                *lhs &= *rhs; 
             }
 
-            //empty set initially. each bit represent a value
+            //be optimistic. Assume variable is dead initially
             virtual BitVector* initializeFlowValue(BasicBlock& b, SetType setType){ 
-                return new BitVector(domainSize, false); 
+                return new BitVector(domainSize, true); 
             }
 
 
@@ -143,7 +140,7 @@ namespace {
                     *immIn = *outNowIn;
 
                     // if this instruction is a new definition, remove it
-                    if (isDefinition(tempInst)){
+            /*        if (isDefinition(tempInst)){
                         (*immIn)[(*valueToBitVectorIndex)[tempInst]] = false;
                     }
 
@@ -168,7 +165,7 @@ namespace {
                             }
                         }
                     }
-
+             */
                     outNowIn = immIn;
 
                     if (ii == ib) break;
@@ -187,6 +184,12 @@ namespace {
             /*-------------------------------------------------------------------------------------------------*/
 
 
+            void printBv(BitVector &bv){
+                for(int i=0;i<domainSize;i++){
+                    //errs() << bv
+                }
+            }
+
             /*------------------------------------------------------------------------------------------------*/
 
             virtual bool runOnFunction(Function &F) {
@@ -200,17 +203,19 @@ namespace {
                 }
 
                 for (inst_iterator instruction = inst_begin(F), e = inst_end(F); instruction != e; ++instruction) {
-                    domain.push_back(&*instruction);
-                    bvIndexToInstrArg->push_back(&*instruction);
-                    (*valueToBitVectorIndex)[&*instruction] = index;
-                    index++;
+                    if (isDefinition(&*instruction)) {
+                        domain.push_back(&*instruction);
+                        bvIndexToInstrArg->push_back(&*instruction);
+                        (*valueToBitVectorIndex)[&*instruction] = index;
+                        index++;
+                    }
                 }
 
                 domainSize = domain.size();
 
                 //initialize the IN set set inside the block for each instruction.     
                 for (inst_iterator instruction = inst_begin(F), e = inst_end(F); instruction != e; ++instruction) {
-                    (*instrInSet)[&*instruction] = new BitVector(domainSize, false); 
+                    (*instrInSet)[&*instruction] = new BitVector(domainSize, true); 
                 }
 
                 DataFlow<BitVector>::runOnFunction(F); //call the analysis method in dataflow

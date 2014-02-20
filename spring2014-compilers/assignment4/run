@@ -1,0 +1,14 @@
+#!/bin/bash
+
+filename=$(basename "$1")
+extension="${filename##*.}"
+filename="${filename%.*}"
+
+
+clang -O0 -emit-llvm -c $1
+opt -mem2reg $filename.bc -o $filename-simp.bc
+#opt -load ./live.so -live $filename.bc -o $filename-simp.bc
+opt -stats -load ./dce-pass.so -dce-pass $filename-simp.bc -o $filename-out.bc
+
+llvm-dis $filename-simp.bc
+llvm-dis $filename-out.bc

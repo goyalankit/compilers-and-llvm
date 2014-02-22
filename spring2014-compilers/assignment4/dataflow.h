@@ -96,7 +96,7 @@ namespace {
                 BasicBlock *hotBlock = *w.begin();
                 w.pop_front();
                 (*visited)[hotBlock] = true;
-                errs() << "Entring Block " << hotBlock->getName() << "\n";
+                errs() << "Entring Block " << hotBlock->getName() << "\n";                
                 //out of this basic block is equivalent to in of it's successor
                 //OUT = Union IN
                 int numSucc = 0; //to check for the exit node

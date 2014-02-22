@@ -37,6 +37,7 @@ Boundary Conditions: empty set for flow value. identified by no successors.
 #include "llvm/Support/InstIterator.h"
 #include "llvm/Assembly/Writer.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/IR/Constants.h"
 
 
 #include "dataflow.h"
@@ -45,6 +46,8 @@ Boundary Conditions: empty set for flow value. identified by no successors.
 #include <fstream>
 #include <iostream>
 #include <stdlib.h>
+#include <queue>
+#include <set>
 
 using namespace llvm;
 
@@ -60,6 +63,7 @@ namespace {
                 bvIndexToInstrArg = new std::vector<Value*>();
                 valueToBitVectorIndex = new ValueMap<Value*, int>();
                 instrInSet = new ValueMap<const Instruction*, BitVector*>();
+                delete_queue = new std::queue<Instruction*>();
             }
 
             /* domain variable. [all the definitions and function arguments in case of liveness] */
@@ -67,6 +71,7 @@ namespace {
             std::vector<Value*> *bvIndexToInstrArg; //map values to their bitvector. Each values has it's own bit vector
             ValueMap<Value*, int> *valueToBitVectorIndex;        //map values (args and variables) to their bit vector index
             ValueMap<const Instruction*, BitVector*> *instrInSet;     //In set for a instruction inside basic block : lower level of granularity
+            std::queue<Instruction*> * delete_queue;
 
             int domainSize;
             int numArgs;
@@ -90,7 +95,7 @@ namespace {
 
             virtual void emitInstructionAnnot(const Instruction *i, formatted_raw_ostream &os) {
                 os << "; ";
-                
+
                 if (!isa<PHINode>(*(i))) {
                     const BitVector *bv = (*instrInSet)[&*i];
                     for (int i=0; i < bv->size(); i++) {
@@ -123,10 +128,10 @@ namespace {
 
             //transfer function:
             //IN[n] = USE[n] U (OUT[n] - DEF[n]) //transfer function
-            
+
             virtual BitVector* transferFn(BasicBlock& bb) {
                 BitVector* outNowIn = new BitVector(*((*out)[&bb]));
-                                   
+
                 BitVector* immIn = outNowIn; // for empty blocks
                 Instruction* tempInst;
                 bool breakme=false;
@@ -139,33 +144,18 @@ namespace {
                     immIn = (*instrInSet)[tempInst];            
                     *immIn = *outNowIn;
 
-                    // if this instruction is a new definition, remove it
-            /*        if (isDefinition(tempInst)){
-                        (*immIn)[(*valueToBitVectorIndex)[tempInst]] = false;
+                    if (!isDefinition(tempInst) || !(*immIn)[(*valueToBitVectorIndex)[tempInst]]) 
+                    {
+                        User::op_iterator OI, OE;
+                        for (OI = tempInst->op_begin(), OE=tempInst->op_end(); OI != OE; ++OI) 
+                        {
+                            if (isa<Instruction>(*OI) || isa<Argument>(*OI)) 
+                            {
+                                (*immIn)[(*valueToBitVectorIndex)[*OI]] = false;
+                            }
+                        }
                     }
 
-                    // add the arguments, unless it is a phi node
-                    if (!isa<PHINode>(*ii)) {
-                        User::op_iterator OI, OE;
-                        for (OI = tempInst->op_begin(), OE=tempInst->op_end(); OI != OE; ++OI) {
-                            if (isa<Instruction>(*OI) || isa<Argument>(*OI)) {
-                                (*immIn)[(*valueToBitVectorIndex)[*OI]] = true;
-                            }
-                        }
-                    }else if(isa<PHINode>(*ii)){
-                        PHINode* phiNode = cast<PHINode>(&*ii);
-                        for (int incomingIdx = 0; incomingIdx < phiNode->getNumIncomingValues(); incomingIdx++) {
-                            Value* val = phiNode->getIncomingValue(incomingIdx);
-                            if (isa<Instruction>(val) || isa<Argument>(val)) {
-                                int valIdx = (*valueToBitVectorIndex)[val];
-                                BasicBlock* incomingBlock = phiNode->getIncomingBlock(incomingIdx);
-                                if ((*neighbourSpecificValues).find(incomingBlock) == (*neighbourSpecificValues).end())
-                                    (*neighbourSpecificValues)[incomingBlock] = new BitVector(domainSize);
-                                (*(*neighbourSpecificValues)[incomingBlock]).set(valIdx);                                
-                            }
-                        }
-                    }
-             */
                     outNowIn = immIn;
 
                     if (ii == ib) break;
@@ -180,14 +170,126 @@ namespace {
                 return !(isa<TerminatorInst>(ii)) ;
             }
 
+            
+            bool removeTheDead(Function &F){
+                BitVector *killed = (*in)[&(F.getEntryBlock())];
+                printBv(*killed);
+
+                std::queue<Instruction*> *delete_queue;
+
+            
+//                for(inst_iterator i = inst_begin(F), ie = inst_end(F); i != ie; i++){
+                for(inst_iterator i = inst_begin(F), ie = inst_end(F); i != ie;){
+//                while(!worklist->empty()){
+                   Instruction *I = &*i;
+                    inst_iterator next(i);
+                    ++next;
+                    if(isDefinition(I) && (*killed)[(*valueToBitVectorIndex)[I]]){
+                        (*instrInSet).erase(I);
+                        I->replaceAllUsesWith(UndefValue::get(I->getType()));
+                        I->removeFromParent();
+                        //delete_queue->push_back(I);
+                    }
+                    i = next;
+                }
+
+//                while(!delete_queue->empty()){
+                    //Instruction *i(delete_queue->back());
+                    //delete_queue->pop_back();
+                    //errs() << "Deleting instruction" << *i;
+                    //delete i; 
+  //              }
+                
+                return true;
+            }
+
+
+
+
+
+            /*------------------------------------------------------------------------------------------------*/
+/*
+
+            void deleteDeadCodeBlock(BasicBlock *blk, BitVector& killed, std::queue<Instruction*>& to_delete)
+            {
+                BasicBlock::InstListType &ls(blk->getInstList());
+                typedef BasicBlock::InstListType::iterator iter;
+     
+                for(iter it(ls.begin()), e(ls.end()); it != e;) {
+                    Instruction& i(*it);
+        
+                    iter next(it);
+                    ++next; 
+                    
+                    
+                    if(isDefinition(&i) && (killed)[(*valueToBitVectorIndex)[&i]]){
+                        (*instrInSet).erase(&i);
+                        i.replaceAllUsesWith(UndefValue::get(i.getType())); 
+                        i.removeFromParent();
+                        to_delete.push(&i); 
+                    }
+
+                    it = next;
+                }
+            }
+
+
+            bool removeTheDead(Function &fun){
+                BitVector *killed = (*in)[&(fun.getEntryBlock())];
+
+
+                std::queue<BasicBlock*> work_list;
+                std::set<BasicBlock*> visited;
+
+                for(Function::iterator i(fun.begin()), e = fun.end(); i != e; ++i) {
+                    if(isa<ReturnInst>(i->getTerminator())) {
+                        BasicBlock *blk(&*i);
+                        work_list.push(blk);
+                        visited.insert(blk);
+                    }
+                }
+
+               std::queue<Instruction*> to_delete;
+
+               while (!work_list.empty()) {
+                   BasicBlock *blk(work_list.front());
+                   work_list.pop();
+
+                   deleteDeadCodeBlock(blk, *killed, to_delete);
+
+                   for(pred_iterator pi(pred_begin(blk)), e(pred_end(blk)); pi != e; pi++) {
+                       BasicBlock *next(*pi);
+                       std::set<BasicBlock*>::const_iterator f(visited.find(next));
+
+                       if(f == visited.end()) {
+                           work_list.push(next);
+                           visited.insert(next);
+                       }
+                   }
+               }
+
+               // now delete everything there is to delete
+               while(!to_delete.empty()) {
+                   Instruction *i(to_delete.front());
+                   to_delete.pop();
+
+                   delete i;
+               } 
+
+            }
+
+
+*/
+
 
             /*-------------------------------------------------------------------------------------------------*/
 
-
-            void printBv(BitVector &bv){
+            void printBv(const BitVector &bv){
+                errs() << "\n { ";
                 for(int i=0;i<domainSize;i++){
-                    //errs() << bv
+                    errs() << bv[0] << ", ";
                 }
+                errs() << " }";
             }
 
             /*------------------------------------------------------------------------------------------------*/
@@ -220,7 +322,8 @@ namespace {
 
                 DataFlow<BitVector>::runOnFunction(F); //call the analysis method in dataflow
                 F.print(errs(), this);
-                return false; //not changing anything
+                removeTheDead(F);
+                return true; //not changing anything
             }
 
             virtual void getAnalysisUsage(AnalysisUsage &AU) const {

@@ -170,66 +170,25 @@ namespace {
                 return !(isa<TerminatorInst>(ii)) ;
             }
 
-            
-            /*
-            bool removeTheDead(Function &F){
-                BitVector *killed = (*in)[&(F.getEntryBlock())];
-                printBv(*killed);
-
-                std::queue<Instruction*> *delete_queue;
-
-            
-//                for(inst_iterator i = inst_begin(F), ie = inst_end(F); i != ie; i++){
-                for(inst_iterator i = inst_begin(F), ie = inst_end(F); i != ie;){
-//                while(!worklist->empty()){
-                   Instruction *I = &*i;
-                   inst_iterator next(i);
-                   ++next;
-                   if(isDefinition(I) && (*killed)[(*valueToBitVectorIndex)[I]]){
-                       (*instrInSet).erase(I);
-                       I->replaceAllUsesWith(UndefValue::get(I->getType()));
-                       I->removeFromParent();
-                       delete_queue->push_back(I);
-                   }
-                    i = next;
-                }
-
-//                while(!delete_queue->empty()){
-                    //Instruction *i(delete_queue->back());
-                    //delete_queue->pop_back();
-                    //errs() << "Deleting instruction" << *i;
-                    //delete i; 
-  //              }
-                
-                return true;
-            }
-*/
-
-
-
 
             /*------------------------------------------------------------------------------------------------*/
 
-
-            void deleteDeadCodeBlock(BasicBlock *blk, BitVector& killed, std::queue<Instruction*>& to_delete)
+            //remove the instruction from parent and replace all uses
+            void processBlockForDeletion(BasicBlock *blk, BitVector& killed, std::queue<Instruction*>& inst_to_be_deleted)
             {
-                BasicBlock::InstListType &ls(blk->getInstList());
-                typedef BasicBlock::InstListType::iterator iter;
-     
-                for(iter it(ls.begin()), e(ls.end()); it != e;) {
+                BasicBlock::InstListType &blist = blk->getInstList();
+                for(BasicBlock::InstListType::iterator it = blist.begin(), e = blist.end(); it != e;){
                     Instruction& i(*it);
-        
-                    iter next(it);
+
+                    BasicBlock::InstListType::iterator next = it;
                     ++next; 
-                    
-                    
+
                     if(isDefinition(&i) && (killed)[(*valueToBitVectorIndex)[&i]]){
-                        (*instrInSet).erase(&i);
+                        (*instrInSet).erase(&i); //value is being used in the map. Needs to be deleted so that it can be removed
                         i.replaceAllUsesWith(UndefValue::get(i.getType())); 
                         i.removeFromParent();
-                        to_delete.push(&i); 
+                        inst_to_be_deleted.push(&i); 
                     }
-
                     it = next;
                 }
             }
@@ -238,50 +197,49 @@ namespace {
             bool removeTheDead(Function &fun){
                 BitVector *killed = (*in)[&(fun.getEntryBlock())];
 
-
                 std::queue<BasicBlock*> work_list;
                 std::set<BasicBlock*> visited;
 
+                //insert the last block in the worklist
                 for(Function::iterator i(fun.begin()), e = fun.end(); i != e; ++i) {
-                    if(isa<ReturnInst>(i->getTerminator())) {
-                        BasicBlock *blk(&*i);
-                        work_list.push(blk);
-                        visited.insert(blk);
+                    int numSucc = 0;
+
+                    for (succ_iterator SI = succ_begin(&*i), SE = succ_end(&*i); SI != SE; SI++)
+                        numSucc++;
+
+                    if(numSucc==0){
+                        work_list.push(&*i);
+                        visited.insert(&*i);
                     }
                 }
 
-               std::queue<Instruction*> to_delete;
+                std::queue<Instruction*> inst_to_be_deleted;
+                
+                //process the blocks in backward direction
+                while (!work_list.empty()) {
+                    BasicBlock *hotBlock = work_list.front();
+                    work_list.pop();
 
-               while (!work_list.empty()) {
-                   BasicBlock *blk(work_list.front());
-                   work_list.pop();
+                    processBlockForDeletion(hotBlock, *killed, inst_to_be_deleted);
 
-                   deleteDeadCodeBlock(blk, *killed, to_delete);
+                    for (pred_iterator PI = pred_begin(hotBlock), E = pred_end(hotBlock); PI != E; ++PI) {
+                        BasicBlock *tempBlk = *PI;
+                        if(visited.find(tempBlk) == visited.end()){
+                            work_list.push(tempBlk);
+                            visited.insert(tempBlk);
+                        }
+                    }
+                }
 
-                   for(pred_iterator pi(pred_begin(blk)), e(pred_end(blk)); pi != e; pi++) {
-                       BasicBlock *next(*pi);
-                       std::set<BasicBlock*>::const_iterator f(visited.find(next));
+                //now every instruction is freed of its uses and can be deleted.
+                while(!inst_to_be_deleted.empty()) {
+                    Instruction *i(inst_to_be_deleted.front());
+                    inst_to_be_deleted.pop();
 
-                       if(f == visited.end()) {
-                           work_list.push(next);
-                           visited.insert(next);
-                       }
-                   }
-               }
-
-               // now delete everything there is to delete
-               while(!to_delete.empty()) {
-                   Instruction *i(to_delete.front());
-                   to_delete.pop();
-
-                   delete i;
-               } 
+                    delete i; //delete the instruction
+                } 
 
             }
-
-
-
-
 
             /*-------------------------------------------------------------------------------------------------*/
 
@@ -297,7 +255,7 @@ namespace {
 
             virtual bool runOnFunction(Function &F) {
                 domain.clear();
-                
+
                 //reset all the variables for a new function
                 bvIndexToInstrArg = new std::vector<Value*>();
                 valueToBitVectorIndex = new ValueMap<Value*, int>();

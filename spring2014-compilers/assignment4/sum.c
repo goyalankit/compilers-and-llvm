@@ -1,11 +1,8 @@
-int sum (int a, int b)
-{
- int i;
- int res = 1;
- for (i = a; i < b; i++) 
- {
- res *= i;
- }
- return a;
+int sum (int a, int b){
+    int i,x;
+    x = 23;
+    for(i=0; i<a; i++){
+        x = x + 1;
+    }
+    return b;
 }
-

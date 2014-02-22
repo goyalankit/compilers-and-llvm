@@ -171,6 +171,7 @@ namespace {
             }
 
             
+            /*
             bool removeTheDead(Function &F){
                 BitVector *killed = (*in)[&(F.getEntryBlock())];
                 printBv(*killed);
@@ -182,14 +183,14 @@ namespace {
                 for(inst_iterator i = inst_begin(F), ie = inst_end(F); i != ie;){
 //                while(!worklist->empty()){
                    Instruction *I = &*i;
-                    inst_iterator next(i);
-                    ++next;
-                    if(isDefinition(I) && (*killed)[(*valueToBitVectorIndex)[I]]){
-                        (*instrInSet).erase(I);
-                        I->replaceAllUsesWith(UndefValue::get(I->getType()));
-                        I->removeFromParent();
-                        //delete_queue->push_back(I);
-                    }
+                   inst_iterator next(i);
+                   ++next;
+                   if(isDefinition(I) && (*killed)[(*valueToBitVectorIndex)[I]]){
+                       (*instrInSet).erase(I);
+                       I->replaceAllUsesWith(UndefValue::get(I->getType()));
+                       I->removeFromParent();
+                       delete_queue->push_back(I);
+                   }
                     i = next;
                 }
 
@@ -202,13 +203,13 @@ namespace {
                 
                 return true;
             }
-
+*/
 
 
 
 
             /*------------------------------------------------------------------------------------------------*/
-/*
+
 
             void deleteDeadCodeBlock(BasicBlock *blk, BitVector& killed, std::queue<Instruction*>& to_delete)
             {
@@ -279,7 +280,7 @@ namespace {
             }
 
 
-*/
+
 
 
             /*-------------------------------------------------------------------------------------------------*/

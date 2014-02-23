@@ -167,7 +167,7 @@ namespace {
             }
 
             bool isDefinition(Instruction *ii) {
-                return !(isa<TerminatorInst>(ii)) ;
+                return !(isa<TerminatorInst>(ii) || isa<CallInst>(ii)) ;
             }
 
 
@@ -186,6 +186,7 @@ namespace {
                     if(isDefinition(&i) && (killed)[(*valueToBitVectorIndex)[&i]]){
                         (*instrInSet).erase(&i); //value is being used in the map. Needs to be deleted so that it can be removed
                         i.replaceAllUsesWith(UndefValue::get(i.getType())); 
+                        //i.eraseFromParent();
                         i.removeFromParent();
                         inst_to_be_deleted.push(&i); 
                     }
@@ -230,14 +231,15 @@ namespace {
                         }
                     }
                 }
-
+                bool deletedSomething = false;
                 //now every instruction is freed of its uses and can be deleted.
-                while(!inst_to_be_deleted.empty()) {
+                while(!inst_to_be_deleted.empty()) {                   
                     Instruction *i(inst_to_be_deleted.front());
                     inst_to_be_deleted.pop();
-
+                    deletedSomething = true;
                     delete i; //delete the instruction
-                } 
+                }
+                return deletedSomething;
 
             }
 
@@ -288,8 +290,7 @@ namespace {
 
                 DataFlow<BitVector>::runOnFunction(F); //call the analysis method in dataflow
                 F.print(errs(), this);
-                removeTheDead(F);
-                return true; //not changing anything
+                return removeTheDead(F);
             }
 
             virtual void getAnalysisUsage(AnalysisUsage &AU) const {

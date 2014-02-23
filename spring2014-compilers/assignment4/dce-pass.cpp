@@ -173,7 +173,7 @@ namespace {
             }
 
 
-            /*------------------------------------------------------------------------------------------------*/
+            /*-----------------------------------------Deletion methods----------------------------------------*/
 
             //remove the instruction from parent and replace all uses
             void processBlockForDeletion(BasicBlock *blk, BitVector& killed)
@@ -235,7 +235,7 @@ namespace {
 
             }
 
-            /*-------------------------------------------------------------------------------------------------*/
+            /*------------------------------------------Print bitvector for debuggin---------------------------*/
 
             void printBv(const BitVector &bv){
                 errs() << "\n { ";
@@ -277,11 +277,12 @@ namespace {
 
                 //initialize the IN set set inside the block for each instruction.     
                 for (inst_iterator instruction = inst_begin(F), e = inst_end(F); instruction != e; ++instruction) {
-                    (*instrInSet)[&*instruction] = new BitVector(domainSize, true); 
+                    (*instrInSet)[&*instruction] = new BitVector(domainSize, true);                   
                 }
 
-                DataFlow<BitVector>::runOnFunction(F); //call the analysis method in dataflow
-                F.print(errs(), this);
+                //Run the liveness analysis to determine the faint variables.
+                DataFlow<BitVector>::runOnFunction(F);
+//                F.print(errs(), this);
                 return removeTheDead(F);
             }
 

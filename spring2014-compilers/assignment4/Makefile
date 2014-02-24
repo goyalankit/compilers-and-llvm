@@ -29,3 +29,5 @@ ll: sum-sim.ll sum-out.ll
 
 clear:
 	rm -f sum-out.bc sum-simp.bc sum-simp.ll sum-out.ll sum.bc
+
+nice: clean clear all run

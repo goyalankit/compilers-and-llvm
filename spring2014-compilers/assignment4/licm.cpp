@@ -193,25 +193,78 @@ namespace {
 
             /*------------------------------------------- identify invariant ---------------------------------------*/
             //TAG A
+            //in and out methods for invariant analysis pass
+            //it would be better to use a struct here for each block
 
-            Bitvector identifyInvariants(BasicBlock& currBlk){
-              /*
+            typedef ValueMap<const BasicBlock*, BitVector*> IvBlockInOutMap;    
+            IvBlockInOutMap *ivIn;
+            IvBlockInOutMap *ivOut;
 
-                   for(Function::iterator bbi = F.begin(), bbie = F.end(); bbi != bbie; bbi++){
-                    BasicBlock *BBI = bbi;
-                    LoopInfo &LI = getAnalysis<LoopInfo>();                    
-                    Loop *loop   = LI.getLoopFor(BBI);
-                    if(loop!=NULL)
-                        loop->dump();
-                }
+            void initializeWorklist(Function &func, Worklist &worklist){
+                BasicBlock& entry = func.getEntryBlock();
+                worklist.push_back(&entry);
+            }
 
-              */
 
+            BitVector* isInvariantTransferFunction(BasicBlock &hotBlock){
+
+           /* 
                 LoopInfo &LI = getAnalysis<LoopInfo>(*(currBlk->getParent()));
                 BasicBlock *blk(currBlk);
                 Loop *loop   = LI.getLoopFor(blk);
                 BasicBlock *immediateDomBlock;
-                
+                */
+                return new BitVector(domainSize, false);
+
+            }
+
+            void traverseInForward(Worklist &w){
+                BasicBlock *hotBlock = *w.begin();
+                w.pop_front();
+                //DEBUG::
+//                errs() << "Entring Block " << hotBlock->getName() << "\n";
+                int numPred = 0;
+                for (pred_iterator PI = pred_begin(hotBlock), E = pred_end(hotBlock); PI != E; ++PI){
+                    ++numPred;
+                    if(PI == pred_begin(hotBlock)){
+                        *(*ivIn)[hotBlock] = *(*ivOut)[*PI];
+                    }else{
+                        *(*ivIn)[hotBlock] |= *(*ivOut)[*PI]; //union
+                    }
+                }
+
+                if(numPred == 0)  setBoundaryCondition((*ivIn)[hotBlock]);
+
+                BitVector *newOut = isInvariantTransferFunction(*hotBlock);
+
+                if(*newOut != *(*ivOut)[hotBlock]){
+                    *(*ivOut)[hotBlock] = *newOut;
+                    for (succ_iterator SI = succ_begin(hotBlock), E = succ_end(hotBlock); SI != E; ++SI) {
+                        w.push_back(*SI); 
+                    } 
+                }
+            }
+
+
+            void identifyInvariants(Function &F){
+                Worklist * worklist = new Worklist();
+                initializeWorklist(F, *worklist);
+
+                ivIn = new IvBlockInOutMap();
+                ivOut = new IvBlockInOutMap();
+
+                for (Function::iterator bi = F.begin(), be = F.end(); bi != be; bi++) {
+                    BasicBlock * bb = &*bi;
+
+                    //set the appropriate values for forward and backward flow
+                    //(*in)[bb] -> bit vector::lattice for that block
+                    (*ivIn)[bb] = new BitVector(domainSize, true);    
+                    (*ivOut)[bb] = new BitVector(domainSize, true);    
+                }
+
+                while(!worklist->empty())
+                    traverseInForward(*worklist);
+
             }
 
             /*------------------------------- Current Pass Methods -------------------------------------------------*/
@@ -250,6 +303,14 @@ namespace {
                 //printMultiMap< std::multimap< BasicBlock*, BasicBlock* > >(dominatorRelations);
                 
                 errs() << "============ END:   Dominator Analysis for function " <<  F.getName() <<"    ==============\n";
+
+
+                errs() << "============ START: Invariant Analysis for function " <<  F.getName() << "   =============\n";
+
+                identifyInvariants(F);
+
+                errs() << "============ END: Invariant Analysis for function " <<  F.getName() << "   =============\n";
+
 //                F.print(errs(), this);
                 return false; //not changing anything
             }
@@ -281,6 +342,6 @@ namespace {
     //    clang -c -emit-llvm loop.c
     //    opt -load ./LoopICM.so -live loop.bc > /dev/null
     // See http://llvm.org/releases/3.4/docs/WritingAnLLVMPass.html#running-a-pass-with-opt for more info.
-    RegisterPass<LoopICM> X("licp-pass", "reaching definitions pass");
+    RegisterPass<LoopICM> X("licm-pass", "reaching definitions pass");
 
 }

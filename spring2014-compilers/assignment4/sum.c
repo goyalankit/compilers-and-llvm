@@ -1,4 +1,3 @@
-#if(0)
 int sum (int a, int b){
 
     int i,x,j, inv;
@@ -8,8 +7,8 @@ int sum (int a, int b){
 
     return inv;
 }
-#endif
 
+#if(0)
 int loop5(int a, int b, int c)
 {
     int inv;
@@ -19,10 +18,12 @@ int loop5(int a, int b, int c)
    {
        b = inv;
        for(;a<b;a++){
-        inv  = c+b+inv;
+        inv  = c+12;
+         
        }
    }
 
 
    return inv;
 }
+#endif

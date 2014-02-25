@@ -88,8 +88,8 @@ namespace {
                     for (int i=0; i < bv->size(); i++) {
                         if ( (*bv)[i] ) {
 
-                     //       WriteAsOperand(os, (*bvIndexToInstrArg)[i], false);
-                     //       os << ", ";
+                            //       WriteAsOperand(os, (*bvIndexToInstrArg)[i], false);
+                            //       os << ", ";
                         }
                     }
                 }
@@ -221,23 +221,24 @@ namespace {
                 BasicBlock *blk(&hotBlock);
 
                 Loop *loop   = LI.getLoopFor(blk);
-                
 
                 if(loop == NULL) return immOut;
-                
-                errs() << "Loop present for  " << blk->getName() << "\n";
+
+                //DEBUG
+                /*errs() << "Loop present for  " << blk->getName() << "\n";
                 errs() << "Getting loop preheader " << loop->getLoopPreheader()->getName() << "\n";
                 errs() << "EXIT BLOCK OF LOOP " << loop->getExitBlock()->getName() << "\n";
 
-                loop->dump();
+                loop->dump();*/
+
                 /*============RENAME========================*/
                 BasicBlock *immediateDomBlock;
-                    
-               
+
                 // now we need the dominator
                 immediateDomBlock =  loop->getLoopPreheader(); // (immPreDomMap)[blk];
                 assert(immediateDomBlock != NULL);
 
+/*                //DEBUG:: This block should be removed.
                 const BitVector *bv = (*in)[immediateDomBlock];
                 for (int i=0; i < bv->size(); i++) {
                     if ( (*bv)[i] ) {
@@ -245,20 +246,12 @@ namespace {
                         errs() << ", ";
                     }
                 }
-
-
+*/
                 // We want the out of the reaching definitions for the dominator block
-                
                 BitVector definedByDominators =*((*in)[immediateDomBlock]);
                 printBv(*((*in)[immediateDomBlock]));
 
                 BasicBlock::InstListType &ls(hotBlock.getInstList());
-
-                std::cout << "==================================================\n";
-
-                hotBlock.dump();
-
-                std::cout << "-----------------\n";
 
                 // iterate the instructions in order
                 for(BasicBlock::InstListType::iterator it(ls.begin()), e(ls.end()); it != e; it++)
@@ -266,36 +259,28 @@ namespace {
                     User::op_iterator OI, OE;
                     bool instIsInv = true;
 
-                    // need to handle phinodes with care
-                    if(isa<PHINode>(it))
-                        continue;
-
-                    // if this a void type skip it:
-                    if(it->getType()->isVoidTy())
+                    if(isa<PHINode>(it) || it->getType()->isVoidTy()) //want to keep these invariant.
                         continue;
 
                     for(OI = it->op_begin(), OE = it->op_end(); OI != OE; ++OI)
                     {
                         Value *val = *OI;
 
-                        // These are the arguments
                         if(isa<Instruction>(val) || isa<Argument>(val)){
                             if((definedByDominators)[(*valueToBitVectorIndex)[val]] || (*immOut)[(*valueToBitVectorIndex)[val]])     
-                                //                if(IS_DEFINED(val,definedByDominators)|| IS_INV(val))
                                 instIsInv&=true;
                             else
                             {
-                                errs() << "Entered the exit block for " << it->getName() << " due to " << val->getName() << "\n"; 
                                 instIsInv&=false;
                                 break;
                             }
                         }else if(isa<Constant>(val)){
+                            errs() << "Loop invariant " << it->getName() << "\n";
                             instIsInv&=true;
                         }
                     }
 
                     if(instIsInv){
-                        errs() << "We have a candidate!! " << it->getName()  <<"\n" ;
                         (*immOut)[(*valueToBitVectorIndex)[it]] = true;
                     }
                 }
@@ -308,11 +293,6 @@ namespace {
             void traverseInForward(Worklist &w){
                 BasicBlock *hotBlock = *w.begin();
                 w.pop_front();
-
-               // visited[hotBlock] = true;
-                //DEBUG::
-                //                errs() << "Entring Block " << hotBlock->getName() << "\n";
-
 
                 int numPred = 0;
                 for (pred_iterator PI = pred_begin(hotBlock), E = pred_end(hotBlock); PI != E; ++PI){
@@ -327,47 +307,18 @@ namespace {
                 if(numPred == 0)  setBoundaryCondition((*ivIn)[hotBlock]);
 
                 BitVector *newOut = isInvariantTransferFunction(*hotBlock);
-                
+
                 bool changed= false;
                 changed = *newOut != *(*ivOut)[hotBlock];
 
                 if(changed)
                     *(*ivOut)[hotBlock] = *newOut;
-                
-                    for (succ_iterator SI = succ_begin(hotBlock), E = succ_end(hotBlock); SI != E; ++SI) {
-                        if(changed) {
-                            w.push_back(*SI); 
-                        } 
-                    }
-            }
 
-            virtual void bfs(Function &f, std::list<BasicBlock*> &worklist) {
-                BasicBlock * curNode;
-                ValueMap<BasicBlock*, bool> *visited = new ValueMap<BasicBlock*,bool>();
-
-                for (Function::iterator bb = f.begin(), be = f.end(); bb != be; bb++) {
-                    (*visited)[&*bb] = false;
+                for (succ_iterator SI = succ_begin(hotBlock), E = succ_end(hotBlock); SI != E; ++SI) {
+                    if(changed) {
+                        w.push_back(*SI); 
+                    } 
                 }
-
-                std::list<BasicBlock*> *l = new std::list<BasicBlock*>();
-
-                l->push_back(&f.getEntryBlock());
-                while (!l->empty()) {
-                    curNode = *(l->begin());
-                    l->pop_front();
-                    worklist.push_back(curNode);
-                    errs() << "ITERATING IN ORDER " << curNode->getName() << "\n"; 
-
-                    (*visited)[curNode] = true;
-                    for (succ_iterator SI = succ_begin(curNode), SE = succ_end(curNode); SI != SE; SI++) {
-                        if (!(*visited)[*SI]) {
-                            l->push_back(*SI);
-                        }
-                    }
-                }
-
-                delete visited;
-                delete l;
             }
 
             void identifyInvariants(Function &F){
@@ -380,13 +331,9 @@ namespace {
                 for (Function::iterator bi = F.begin(), be = F.end(); bi != be; bi++) {
                     BasicBlock * bb = &*bi;
 
-                    //set the appropriate values for forward and backward flow
-                    //(*in)[bb] -> bit vector::lattice for that block
                     (*ivIn)[bb] = new BitVector(domainSize, false);    
                     (*ivOut)[bb] = new BitVector(domainSize, false);    
                 }
-
-                bfs(F,*worklist); 
 
                 while(!worklist->empty())
                     traverseInForward(*worklist);
@@ -394,7 +341,7 @@ namespace {
             }
 
             /*------------------------------- Current Pass Methods -------------------------------------------------*/
-
+            //debug method to check dominator relations.
             void drel (Function &F) {
                 DominatorTree &DT = getAnalysis<DominatorTree>();
                 for(Function::iterator bbi = F.begin(), bbie = F.end(); bbi != bbie; bbi++){
@@ -402,10 +349,15 @@ namespace {
                     for(Function::iterator bbj = F.begin(), bbje = F.end(); bbj != bbje; bbj++){
                         BasicBlock *BBJ = bbj;
                         if(BBI != BBJ && DT.dominates(BBI, BBJ)){
-                            errs() << BBI->getName() << " " << BBJ->getName() << "\n";
+                            errs() << BBI->getName() << " doms " << BBJ->getName() << "\n";
                         }
                     }
                 }
+            }
+
+
+            virtual void applyCodeMotion(Function &F){
+            
             }
 
 
@@ -451,7 +403,7 @@ namespace {
                 DominatorTree &DT = getAnalysis<DominatorTree>();
                 // DT.dump();
                 ProcessDomTree(DT.getRootNode(), 0);
-  //              printMultiMap< std::map< BasicBlock*, BasicBlock* > >(immPreDomMap);
+                //              printMultiMap< std::map< BasicBlock*, BasicBlock* > >(immPreDomMap);
                 errs() << "============ END: Getting Immediate Predominators for each basic block " <<  F.getName() << "   =============\n\n\n";
 
 
@@ -463,7 +415,7 @@ namespace {
                 errs() << "============ END: Invariant Analysis for function " <<  F.getName() << "   =============\n";
 
 
-               F.print(errs(), this);
+                F.print(errs(), this);
                 return false; //not changing anything
             }
 
@@ -475,13 +427,8 @@ namespace {
 
     };
 
-    // LLVM uses the address of this static member to identify the pass, so the
-    // initialization value is unimportant.
     char LoopICM::ID = 0;
 
-    // Register this pass to be used by language front ends.
-    // This allows this pass to be called using the command:
-    //    clang -c -Xclang -load -Xclang ./LoopICM.so loop.c
     static void registerMyPass(const PassManagerBuilder &,
             PassManagerBase &PM) {
         PM.add(new LoopICM());
@@ -490,10 +437,6 @@ namespace {
         RegisterMyPass(PassManagerBuilder::EP_EarlyAsPossible,
                 registerMyPass);
 
-    // Register the pass name to allow it to be called with opt:
-    //    clang -c -emit-llvm loop.c
-    //    opt -load ./LoopICM.so -live loop.bc > /dev/null
-    // See http://llvm.org/releases/3.4/docs/WritingAnLLVMPass.html#running-a-pass-with-opt for more info.
     RegisterPass<LoopICM> X("licm-pass", "reaching definitions pass");
 
 }

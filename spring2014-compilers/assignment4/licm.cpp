@@ -69,7 +69,8 @@ namespace {
             virtual void emitBasicBlockStartAnnot(const BasicBlock *bb, formatted_raw_ostream &os) {
                 os << "; ";
                 if (!isa<PHINode>(*(bb))) {
-                    const BitVector *bv = (*in)[&*bb];
+                    //const BitVector *bv = (*in)[&*bb];
+                    const BitVector *bv = (*ivIn)[&*bb];
                     for (int i=0; i < bv->size(); i++) {
                         if ( (*bv)[i] ) {
                             WriteAsOperand(os, (*bvIndexToInstrArg)[i], false);
@@ -87,8 +88,8 @@ namespace {
                     for (int i=0; i < bv->size(); i++) {
                         if ( (*bv)[i] ) {
 
-                            WriteAsOperand(os, (*bvIndexToInstrArg)[i], false);
-                            os << ", ";
+                     //       WriteAsOperand(os, (*bvIndexToInstrArg)[i], false);
+                     //       os << ", ";
                         }
                     }
                 }
@@ -139,7 +140,7 @@ namespace {
                         for (int incomingIdx = 0; incomingIdx < phiNode->getNumIncomingValues(); incomingIdx++) {
                             Value* val = phiNode->getIncomingValue(incomingIdx);
                             if (isa<Instruction>(val) || isa<Argument>(val)) {
-                                (*immOut)[(*valueToBitVectorIndex)[val]] = false;
+                                //(*immOut)[(*valueToBitVectorIndex)[val]] = false;
                             }
                         }
                     }
@@ -162,6 +163,14 @@ namespace {
                         errs() << it->first->getName() << " " << it->second->getName() << "\n";
                     }
                 }
+
+            void printBv(const BitVector &bv){
+                errs() << "\n { ";
+                for(int i=0;i<domainSize;i++){
+                    errs() << bv[0] << ", ";
+                }
+                errs() << " }";
+            }
 
 
 
@@ -212,97 +221,99 @@ namespace {
                 BasicBlock *blk(&hotBlock);
 
                 Loop *loop   = LI.getLoopFor(blk);
+                
 
                 if(loop == NULL) return immOut;
+                
+                errs() << "Loop present for  " << blk->getName() << "\n";
+                errs() << "Getting loop preheader " << loop->getLoopPreheader()->getName() << "\n";
+                errs() << "EXIT BLOCK OF LOOP " << loop->getExitBlock()->getName() << "\n";
 
-                //                loop->dump();
-                // BasicBlock *immediateDomBlock;
-
-
-                /*=-=====================-----=-=------------------------------==----======-=-==-=-
-
+                loop->dump();
+                /*============RENAME========================*/
+                BasicBlock *immediateDomBlock;
+                    
+               
                 // now we need the dominator
-                immediateDomBlock = (*globalPredDominatorTree)[blk];
+                immediateDomBlock =  loop->getLoopPreheader(); // (immPreDomMap)[blk];
                 assert(immediateDomBlock != NULL);
 
+                const BitVector *bv = (*in)[immediateDomBlock];
+                for (int i=0; i < bv->size(); i++) {
+                    if ( (*bv)[i] ) {
+                        WriteAsOperand(errs(), (*bvIndexToInstrArg)[i], false);
+                        errs() << ", ";
+                    }
+                }
+
+
                 // We want the out of the reaching definitions for the dominator block
-                bitvector definedByDominators(globalRD->getMap(immediateDomBlock)->out);
-                BasicBlock::InstListType &ls(blk->getInstList());
+                
+                BitVector definedByDominators =*((*in)[immediateDomBlock]);
+                printBv(*((*in)[immediateDomBlock]));
 
-                cout << "==================================================\n";
+                BasicBlock::InstListType &ls(hotBlock.getInstList());
 
-                blk->dump();
+                std::cout << "==================================================\n";
 
-                cout << "-----------------\n";
+                hotBlock.dump();
+
+                std::cout << "-----------------\n";
 
                 // iterate the instructions in order
                 for(BasicBlock::InstListType::iterator it(ls.begin()), e(ls.end()); it != e; it++)
                 {
-                User::op_iterator OI, OE;
-                bool instIsInv = true;
+                    User::op_iterator OI, OE;
+                    bool instIsInv = true;
 
-#if 0 // i need to revisit this
+                    // need to handle phinodes with care
+                    if(isa<PHINode>(it))
+                        continue;
 
-                // need to handle stores and loads with care
-                if(isa<StoreInst>(it))
-                {
-                StoreInst *li = (StoreInst*)&it;
-                //cout << "store: " << IS_DEFINED(li->getPointerOperand(),definedByDominators) << endl;
-                errs() << "store: " << li->getPointerOperand()->getName() << "\n";
-                }
-                else if(isa<LoadInst>(it))
-                {
-                //LoadInst *li = (LoadInst*)&it;
-                //cout << "load: " << IS_DEFINED(li->getPointerOperand(),definedByDominators) << endl;
-                }
+                    // if this a void type skip it:
+                    if(it->getType()->isVoidTy())
+                        continue;
 
-#endif
+                    for(OI = it->op_begin(), OE = it->op_end(); OI != OE; ++OI)
+                    {
+                        Value *val = *OI;
 
-                // need to handle phinodes with care
-                if(isa<PHINode>(it))
-                continue;
+                        // These are the arguments
+                        if(isa<Instruction>(val) || isa<Argument>(val)){
+                            if((definedByDominators)[(*valueToBitVectorIndex)[val]] || (*immOut)[(*valueToBitVectorIndex)[val]])     
+                                //                if(IS_DEFINED(val,definedByDominators)|| IS_INV(val))
+                                instIsInv&=true;
+                            else
+                            {
+                                errs() << "Entered the exit block for " << it->getName() << " due to " << val->getName() << "\n"; 
+                                instIsInv&=false;
+                                break;
+                            }
+                        }else if(isa<Constant>(val)){
+                            instIsInv&=true;
+                        }
+                    }
 
-                // if this a void type skip it:
-                if(it->getType()->isVoidTy())
-                continue;
-
-                for(OI = it->op_begin(), OE = it->op_end(); OI != OE; ++OI)
-                {
-                Value *val = *OI;
-
-                // These are the arguments
-                if(isa<Instruction>(val) || isa<Argument>(val))
-                // we need to test if IT is invariant:
-                // all of its arguments are defined outside the block, or by other invariants.
-                // is this argument already defined at entry time?
-                // is this variable invariant?
-                if(IS_DEFINED(val,definedByDominators)|| IS_INV(val))
-                instIsInv&=true;
-                else
-                {
-                instIsInv&=false;
-                break;
-                }
-                }
-                if(instIsInv)
-                INV_VALUE(it);
+                    if(instIsInv){
+                        errs() << "We have a candidate!! " << it->getName()  <<"\n" ;
+                        (*immOut)[(*valueToBitVectorIndex)[it]] = true;
+                    }
                 }
 
-
-
-
-                =-=====================-----=-=------------------------------==----======-=-==-=-*/
-
-
-                    return new BitVector(domainSize, false);
+                return immOut;
 
             }
 
+            ValueMap<BasicBlock*, bool> visited;
             void traverseInForward(Worklist &w){
                 BasicBlock *hotBlock = *w.begin();
                 w.pop_front();
+
+               // visited[hotBlock] = true;
                 //DEBUG::
                 //                errs() << "Entring Block " << hotBlock->getName() << "\n";
+
+
                 int numPred = 0;
                 for (pred_iterator PI = pred_begin(hotBlock), E = pred_end(hotBlock); PI != E; ++PI){
                     ++numPred;
@@ -316,17 +327,48 @@ namespace {
                 if(numPred == 0)  setBoundaryCondition((*ivIn)[hotBlock]);
 
                 BitVector *newOut = isInvariantTransferFunction(*hotBlock);
+                
+                bool changed= false;
+                changed = *newOut != *(*ivOut)[hotBlock];
 
-
-                if(*newOut != *(*ivOut)[hotBlock]){
+                if(changed)
                     *(*ivOut)[hotBlock] = *newOut;
+                
                     for (succ_iterator SI = succ_begin(hotBlock), E = succ_end(hotBlock); SI != E; ++SI) {
-                        w.push_back(*SI); 
-                    } 
-                }
-
+                        if(changed) {
+                            w.push_back(*SI); 
+                        } 
+                    }
             }
 
+            virtual void bfs(Function &f, std::list<BasicBlock*> &worklist) {
+                BasicBlock * curNode;
+                ValueMap<BasicBlock*, bool> *visited = new ValueMap<BasicBlock*,bool>();
+
+                for (Function::iterator bb = f.begin(), be = f.end(); bb != be; bb++) {
+                    (*visited)[&*bb] = false;
+                }
+
+                std::list<BasicBlock*> *l = new std::list<BasicBlock*>();
+
+                l->push_back(&f.getEntryBlock());
+                while (!l->empty()) {
+                    curNode = *(l->begin());
+                    l->pop_front();
+                    worklist.push_back(curNode);
+                    errs() << "ITERATING IN ORDER " << curNode->getName() << "\n"; 
+
+                    (*visited)[curNode] = true;
+                    for (succ_iterator SI = succ_begin(curNode), SE = succ_end(curNode); SI != SE; SI++) {
+                        if (!(*visited)[*SI]) {
+                            l->push_back(*SI);
+                        }
+                    }
+                }
+
+                delete visited;
+                delete l;
+            }
 
             void identifyInvariants(Function &F){
                 Worklist * worklist = new Worklist();
@@ -340,9 +382,11 @@ namespace {
 
                     //set the appropriate values for forward and backward flow
                     //(*in)[bb] -> bit vector::lattice for that block
-                    (*ivIn)[bb] = new BitVector(domainSize, true);    
-                    (*ivOut)[bb] = new BitVector(domainSize, true);    
+                    (*ivIn)[bb] = new BitVector(domainSize, false);    
+                    (*ivOut)[bb] = new BitVector(domainSize, false);    
                 }
+
+                bfs(F,*worklist); 
 
                 while(!worklist->empty())
                     traverseInForward(*worklist);
@@ -350,6 +394,20 @@ namespace {
             }
 
             /*------------------------------- Current Pass Methods -------------------------------------------------*/
+
+            void drel (Function &F) {
+                DominatorTree &DT = getAnalysis<DominatorTree>();
+                for(Function::iterator bbi = F.begin(), bbie = F.end(); bbi != bbie; bbi++){
+                    BasicBlock *BBI = bbi;
+                    for(Function::iterator bbj = F.begin(), bbje = F.end(); bbj != bbje; bbj++){
+                        BasicBlock *BBJ = bbj;
+                        if(BBI != BBJ && DT.dominates(BBI, BBJ)){
+                            errs() << BBI->getName() << " " << BBJ->getName() << "\n";
+                        }
+                    }
+                }
+            }
+
 
             virtual bool runOnFunction(Function &F) {
                 domain.clear();
@@ -364,6 +422,15 @@ namespace {
                 }
 
                 for (inst_iterator instruction = inst_begin(F), e = inst_end(F); instruction != e; ++instruction) {
+
+                    Instruction* instr = &*instruction;
+                    errs() << "use: " <<*instr << "\n";
+                    for (User::op_iterator i = instr -> op_begin(), e = instr -> op_end(); i != e; ++i) {
+                        Value *v = *i;
+                        Instruction *vi = dyn_cast<Instruction>(*i);
+                        errs() << "\t\t" << *vi << "\n";
+                    }
+
                     domain.push_back(&*instruction);
                     bvIndexToInstrArg->push_back(&*instruction);
                     (*valueToBitVectorIndex)[&*instruction] = index;
@@ -384,7 +451,7 @@ namespace {
                 DominatorTree &DT = getAnalysis<DominatorTree>();
                 // DT.dump();
                 ProcessDomTree(DT.getRootNode(), 0);
-                printMultiMap< std::map< BasicBlock*, BasicBlock* > >(immPreDomMap);
+  //              printMultiMap< std::map< BasicBlock*, BasicBlock* > >(immPreDomMap);
                 errs() << "============ END: Getting Immediate Predominators for each basic block " <<  F.getName() << "   =============\n\n\n";
 
 
@@ -392,10 +459,11 @@ namespace {
                 errs() << "============ START: Invariant Analysis for function " <<  F.getName() << "   =============\n";
 
                 identifyInvariants(F);
-
+                drel(F);
                 errs() << "============ END: Invariant Analysis for function " <<  F.getName() << "   =============\n";
 
-                //                F.print(errs(), this);
+
+               F.print(errs(), this);
                 return false; //not changing anything
             }
 

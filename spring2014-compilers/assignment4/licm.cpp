@@ -154,9 +154,48 @@ namespace {
             bool isDefinition(Instruction *ii) {
                 return !(isa<TerminatorInst>(ii)) ;
             }
+            /*---------------------------- General Purpose debug methods for printing stuff -----------------------*/
 
+            template <typename T>
+                void printMultiMap(T  mymap){                                
+                    for(typename T::iterator it = mymap.begin(), ite=mymap.end(); it!=ite; ++it){
+                        errs() << it->first->getName() << " " << it->second->getName() << "\n";
+                    }
+                }
+
+ 
 
             /*-----------------------------  Dominator specific methods ---------------------------------------*/
+
+            
+            std::map<BasicBlock*, BasicBlock*> predDom;
+
+            BasicBlock* ProcessDomTree( const DomTreeNode *Node, size_t Level ) {
+
+                if( !Node )
+                    return NULL;
+
+                // Print current basic block
+                errs().indent( Level * 2 + 2 );
+
+                BasicBlock *BB = Node->getBlock();
+
+                if( BB->hasName() )
+                    errs() << BB->getName() << "\n";
+                else
+                    errs() << "<unnamed>\n";
+
+                // Traverse child nodes
+                for( DomTreeNode::const_iterator I = Node->begin(),
+                        E = Node->end() ; I != E ; ++I ) {
+                    BasicBlock *BC = ProcessDomTree( *I, Level + 1 );
+                    if(BC != NULL)
+                        predDom.insert(std::pair<BasicBlock*, BasicBlock *>(BC, BB));
+                }
+                return BB;
+            }
+
+
               
             //taken from : http://163.25.101.87/~yen3/wiki/doku.php?id=llvm:llvm_notes#dominator_tree_transveral
             virtual std::multimap<BasicBlock*, BasicBlock*> parseDominatorTree(Function &F){
@@ -165,33 +204,62 @@ namespace {
                 
                 errs() << "----------- START: Dominator Tree for function " <<  F.getName() << "  --------------\n";
                 DominatorTree &DT = getAnalysis<DominatorTree>();
+                ProcessDomTree(DT.getRootNode(), 0);
                 DT.dump();
                 errs() << "----------- END:   Dominator Tree for function " <<  F.getName() << "   --------------\n";
+                std::map<BasicBlock*, std::set<BasicBlock*> > domsets;
 
+                printMultiMap< std::map<BasicBlock*, BasicBlock*> > (predDom);
+/*
                 for(Function::iterator bbi = F.begin(), bbie = F.end(); bbi != bbie; bbi++){
                     BasicBlock *BBI = bbi;
                     for(Function::iterator bbj = F.begin(), bbje = F.end(); bbj != bbje; bbj++){
                         BasicBlock *BBJ = bbj;
                         if(BBI != BBJ && DT.dominates(BBI, BBJ)){
+
+                            
                             errs() << BBI->getName() << " dominates " << BBJ->getName() << "\n";
+
+
                             domRelations.insert(std::pair<BasicBlock*, BasicBlock*>(BBI,BBJ));
                         }
                     }
                 }
+*/
                 return domRelations;
             }
 
-            
-            /*---------------------------- General Purpose debug methods for printing stuff -----------------------*/
+            virtual std::map<BasicBlock*, BasicBlock*> dfsOnDomRelation(std::multimap<BasicBlock*, BasicBlock*> domRelation, Function &F){
+                std::map<BasicBlock*,BasicBlock*> localDomBlockForBlock;
 
-            template <typename T>
-            void printMultiMap(T  mymap){                                
-                for(typename T::iterator it = mymap.begin(), ite=mymap.end(); it!=ite; ++it){
-                    errs() << it->first->getName() << " " << it->second->getName() << "\n";
+                std::map<BasicBlock*, bool> visited;
+                std::list<BasicBlock*> * stk = new std::list<BasicBlock*>();
+
+                //push the entry block
+                BasicBlock *entryBlk = &F.getEntryBlock();
+                stk->push_back(entryBlk);
+                visited[entryBlk]=true;
+                
+                while(!stk->empty())
+                {
+                    BasicBlock *t = stk->back();
+                    stk->pop_back();
+                    for(std::multimap<BasicBlock*,BasicBlock*>::iterator it = domRelation.begin(); it != domRelation.end(); ++it ){
+                        if(!visited[it->second])
+                        {
+                            BasicBlock *v = (BasicBlock*)(it->second);
+                            localDomBlockForBlock[v]=t;
+                            stk->push_back(v);
+                            visited[v] = true;
+                        }
+                    }
                 }
+
+                delete stk;
+                return localDomBlockForBlock; 
             }
 
-            /*------------------------------------------- identify invariant ---------------------------------------*/
+           /*------------------------------------------- identify invariant ---------------------------------------*/
             //TAG A
             //in and out methods for invariant analysis pass
             //it would be better to use a struct here for each block
@@ -206,14 +274,96 @@ namespace {
             }
 
 
-            BitVector* isInvariantTransferFunction(BasicBlock &hotBlock){
+            BitVector* isInvariantTransferFunction(BasicBlock &hotBlock){                 
+                BitVector* outNowIn = new BitVector(*((*ivIn)[&hotBlock]));
+                BitVector* immOut = outNowIn; // for empty blocks
 
-           /* 
-                LoopInfo &LI = getAnalysis<LoopInfo>(*(currBlk->getParent()));
-                BasicBlock *blk(currBlk);
+                LoopInfo &LI = getAnalysis<LoopInfo>();
+                BasicBlock *blk(&hotBlock);
+              
                 Loop *loop   = LI.getLoopFor(blk);
-                BasicBlock *immediateDomBlock;
-                */
+
+                if(loop == NULL) return immOut;
+
+                loop->dump();
+               // BasicBlock *immediateDomBlock;
+
+
+/*=-=====================-----=-=------------------------------==----======-=-==-=-
+
+        // now we need the dominator
+        immediateDomBlock = (*globalPredDominatorTree)[blk];
+        assert(immediateDomBlock != NULL);
+
+        // We want the out of the reaching definitions for the dominator block
+        bitvector definedByDominators(globalRD->getMap(immediateDomBlock)->out);
+        BasicBlock::InstListType &ls(blk->getInstList());
+
+        cout << "==================================================\n";
+
+        blk->dump();
+
+        cout << "-----------------\n";
+
+        // iterate the instructions in order
+        for(BasicBlock::InstListType::iterator it(ls.begin()), e(ls.end()); it != e; it++)
+        {
+            User::op_iterator OI, OE;
+            bool instIsInv = true;
+
+#if 0 // i need to revisit this
+
+            // need to handle stores and loads with care
+            if(isa<StoreInst>(it))
+            {
+                StoreInst *li = (StoreInst*)&it;
+                //cout << "store: " << IS_DEFINED(li->getPointerOperand(),definedByDominators) << endl;
+                errs() << "store: " << li->getPointerOperand()->getName() << "\n";
+            }
+            else if(isa<LoadInst>(it))
+            {
+                //LoadInst *li = (LoadInst*)&it;
+                //cout << "load: " << IS_DEFINED(li->getPointerOperand(),definedByDominators) << endl;
+            }
+
+#endif
+
+            // need to handle phinodes with care
+            if(isa<PHINode>(it))
+                continue;
+
+            // if this a void type skip it:
+            if(it->getType()->isVoidTy())
+                continue;
+
+            for(OI = it->op_begin(), OE = it->op_end(); OI != OE; ++OI)
+            {
+                Value *val = *OI;
+
+                // These are the arguments
+                if(isa<Instruction>(val) || isa<Argument>(val))
+                    // we need to test if IT is invariant:
+                    // all of its arguments are defined outside the block, or by other invariants.
+                    // is this argument already defined at entry time?
+                    // is this variable invariant?
+                    if(IS_DEFINED(val,definedByDominators)|| IS_INV(val))
+                        instIsInv&=true;
+                    else
+                    {
+                        instIsInv&=false;
+                        break;
+                    }
+            }
+            if(instIsInv)
+                INV_VALUE(it);
+        }
+
+
+
+
+=-=====================-----=-=------------------------------==----======-=-==-=-*/
+
+                 
                 return new BitVector(domainSize, false);
 
             }
@@ -222,7 +372,7 @@ namespace {
                 BasicBlock *hotBlock = *w.begin();
                 w.pop_front();
                 //DEBUG::
-//                errs() << "Entring Block " << hotBlock->getName() << "\n";
+                errs() << "Entring Block " << hotBlock->getName() << "\n";
                 int numPred = 0;
                 for (pred_iterator PI = pred_begin(hotBlock), E = pred_end(hotBlock); PI != E; ++PI){
                     ++numPred;
@@ -237,12 +387,14 @@ namespace {
 
                 BitVector *newOut = isInvariantTransferFunction(*hotBlock);
 
+
                 if(*newOut != *(*ivOut)[hotBlock]){
                     *(*ivOut)[hotBlock] = *newOut;
                     for (succ_iterator SI = succ_begin(hotBlock), E = succ_end(hotBlock); SI != E; ++SI) {
                         w.push_back(*SI); 
                     } 
                 }
+                
             }
 
 
@@ -301,6 +453,11 @@ namespace {
 
                 std::multimap<BasicBlock*, BasicBlock*> dominatorRelations = parseDominatorTree(F);                
                 //printMultiMap< std::multimap< BasicBlock*, BasicBlock* > >(dominatorRelations);
+
+                
+                std::map<BasicBlock*,BasicBlock*> predDominatorTree = dfsOnDomRelation(dominatorRelations,F);
+                printMultiMap< std::map< BasicBlock*, BasicBlock* > >(predDominatorTree);
+                
                 
                 errs() << "============ END:   Dominator Analysis for function " <<  F.getName() <<"    ==============\n";
 

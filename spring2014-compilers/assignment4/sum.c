@@ -1,29 +1,12 @@
-int sum (int a, int b){
-
-    int i,x,j, inv;
-    for(i=0; i<a; i++){
-        inv = a+b;
+void doIt(int a, int b){
+    int i,j, inv;
+    for(i=0;;i++){
+        for(j=0;;j++){
+            inv = a +b;
+            if(j<b) break;        
+        }
+        if(i<b) break;
     }
 
-    return inv;
+
 }
-
-#if(0)
-int loop5(int a, int b, int c)
-{
-    int inv;
-    inv = a +b;
-
-   for(; a < b; a++)
-   {
-       b = inv;
-       for(;a<b;a++){
-        inv  = c+12;
-         
-       }
-   }
-
-
-   return inv;
-}
-#endif

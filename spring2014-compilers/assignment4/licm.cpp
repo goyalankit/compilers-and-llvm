@@ -10,6 +10,7 @@
  *********************************************************************************/
 
 
+#define DEBUG_TYPE "licm-pass" 
 
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
@@ -29,6 +30,7 @@
 #include "llvm/Assembly/Writer.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/ADT/Statistic.h"
 
 
 #include "dataflow.h"
@@ -37,6 +39,8 @@
 #include <fstream>
 #include <iostream>
 #include <stdlib.h>
+
+STATISTIC(NumHoisted, "The # of hoists. increaments by 1 for each level hoist.");
 
 using namespace llvm;
 
@@ -52,6 +56,7 @@ namespace {
                 bvIndexToInstrArg = new std::vector<Value*>();
                 valueToBitVectorIndex = new ValueMap<Value*, int>();
                 instrInSet = new ValueMap<const Instruction*, BitVector*>();
+                modifed = false;
             }
 
             /* domain variable. [all the definitions and function arguments in case of liveness] */
@@ -63,6 +68,7 @@ namespace {
             int domainSize;
             int numArgs;
             int numInstr;
+            bool modifed;
 
             /*----------------------------------------implement display methods--------------------------------*/
 
@@ -226,10 +232,10 @@ namespace {
 
                 //DEBUG
                 /*errs() << "Loop present for  " << blk->getName() << "\n";
-                errs() << "Getting loop preheader " << loop->getLoopPreheader()->getName() << "\n";
-                errs() << "EXIT BLOCK OF LOOP " << loop->getExitBlock()->getName() << "\n";
+                  errs() << "Getting loop preheader " << loop->getLoopPreheader()->getName() << "\n";
+                  errs() << "EXIT BLOCK OF LOOP " << loop->getExitBlock()->getName() << "\n";
 
-                loop->dump();*/
+                  loop->dump();*/
 
                 /*============RENAME========================*/
                 BasicBlock *immediateDomBlock;
@@ -238,15 +244,15 @@ namespace {
                 immediateDomBlock =  loop->getLoopPreheader(); // (immPreDomMap)[blk];
                 assert(immediateDomBlock != NULL);
 
-/*                //DEBUG:: This block should be removed.
-                const BitVector *bv = (*in)[immediateDomBlock];
-                for (int i=0; i < bv->size(); i++) {
-                    if ( (*bv)[i] ) {
-                        WriteAsOperand(errs(), (*bvIndexToInstrArg)[i], false);
-                        errs() << ", ";
-                    }
-                }
-*/
+                /*                //DEBUG:: This block should be removed.
+                                  const BitVector *bv = (*in)[immediateDomBlock];
+                                  for (int i=0; i < bv->size(); i++) {
+                                  if ( (*bv)[i] ) {
+                                  WriteAsOperand(errs(), (*bvIndexToInstrArg)[i], false);
+                                  errs() << ", ";
+                                  }
+                                  }
+                 */
                 // We want the out of the reaching definitions for the dominator block
                 BitVector definedByDominators =*((*in)[immediateDomBlock]);
                 printBv(*((*in)[immediateDomBlock]));
@@ -264,7 +270,12 @@ namespace {
 
                     for(OI = it->op_begin(), OE = it->op_end(); OI != OE; ++OI)
                     {
+
                         Value *val = *OI;
+                        if(isa<PHINode>(val)){
+                            instIsInv&=false;
+                            break;
+                        } 
 
                         if(isa<Instruction>(val) || isa<Argument>(val)){
                             if((definedByDominators)[(*valueToBitVectorIndex)[val]] || (*immOut)[(*valueToBitVectorIndex)[val]])     
@@ -281,6 +292,7 @@ namespace {
                     }
 
                     if(instIsInv){
+                        errs() << "Loop invariant " << it->getName() << "\n";
                         (*immOut)[(*valueToBitVectorIndex)[it]] = true;
                     }
                 }
@@ -356,8 +368,96 @@ namespace {
             }
 
 
-            virtual void applyCodeMotion(Function &F){
-            
+            void dfs(BasicBlock &node, Worklist &worklist, ValueMap<BasicBlock*, bool> &visited){
+                visited[&node] = true;
+                for (succ_iterator SI = succ_begin(&node), E = succ_end(&node); SI != E; ++SI) {
+                    if(!visited[*SI]){
+                        worklist.push_back(*SI);
+                        BasicBlock* B = *SI;
+                        dfs(*B, worklist, visited);
+                    }
+                }
+            }
+
+            virtual void dfsres(Function &F, Worklist &worklist){
+                ValueMap<BasicBlock*, bool> visited;
+                worklist.push_back(&F.getEntryBlock());
+                visited[&F.getEntryBlock()] = true;
+                dfs(F.getEntryBlock(), worklist, visited);
+            }
+
+            ValueMap<Instruction*, Instruction*> to_be_moved;
+
+            virtual void applyCodeMotion(Worklist &worklist){
+                while(!worklist.empty()){
+
+                    BasicBlock* CB = worklist.front();
+                    worklist.pop_front();
+
+                    BitVector ivCurrent = *(*ivOut)[CB];                    
+
+                    BasicBlock::InstListType &ls(CB->getInstList());
+
+                    LoopInfo &LI = getAnalysis<LoopInfo>();
+                    Loop *loop   = LI.getLoopFor(CB);
+
+                    if(loop == NULL) continue;
+                    //                    loop->getExitBlock();
+                    SmallVector<BasicBlock*, 128> exitBlocks;
+                    loop->getUniqueExitBlocks(exitBlocks);
+
+                    //TODO: make it a global variable
+                    DominatorTree &DT = getAnalysis<DominatorTree>();
+                    for(BasicBlock::InstListType::iterator it(ls.begin()), e(ls.end()); it != e ; )
+                    {
+                        bool canMove = false;
+                        if(it->getType()->isVoidTy()) {
+                            ++it;
+                            continue;
+                        }                                               
+
+                        Instruction *ii = &*it;
+
+                        if(ivCurrent[(*valueToBitVectorIndex)[it]]){ //check that the instruction is invariant
+                            canMove = true;
+                            //check that the block dominates all exits.
+                            for(SmallVectorImpl<BasicBlock*>::iterator i = exitBlocks.begin(), e = exitBlocks.end(); i != e; ++i) {
+                                BasicBlock* bb = (*i);
+                                if(DT.dominates(CB,bb)){
+                                    canMove &= true;
+                                }else{
+                                    errs() << "REASON " << CB->getName()  << "doesn;t dominate " << bb->getName() << "\n";
+                                    canMove &= false;
+                                }
+                            }
+                        }
+
+                        //todo check the instruciton dominate all uses.
+                        
+                        for(Value::use_iterator ui = ii->use_begin(), ue = ii->use_end(); ui!=ue; ++ui){
+                            Instruction *vi = dyn_cast<Instruction>(*ui);
+                            if(!DT.dominates(ii,vi)) {
+                                canMove &= false;
+                                errs() << *ii << " doesn't dominate " << *vi << "\n";
+                            }
+                        }  
+
+                        //Move the instruction
+                        if(canMove){
+                            Instruction *ti = loop->getLoopPreheader()->getTerminator();
+                            ++it;
+                            ii->moveBefore(ti);
+                            worklist.push_back(loop->getLoopPreheader());
+                            errs() << "TRYING TO MOVE" << *ii << "\n";
+                            modifed = true;
+                            ++NumHoisted;
+                        }else{
+                            ++it;
+                        }
+                    }
+
+
+                }                  
             }
 
 
@@ -407,16 +507,26 @@ namespace {
                 errs() << "============ END: Getting Immediate Predominators for each basic block " <<  F.getName() << "   =============\n\n\n";
 
 
-
                 errs() << "============ START: Invariant Analysis for function " <<  F.getName() << "   =============\n";
 
                 identifyInvariants(F);
                 drel(F);
                 errs() << "============ END: Invariant Analysis for function " <<  F.getName() << "   =============\n";
 
+                Worklist worklist;
+                dfsres(F, worklist);
+
+                errs() << "Worklist print------------------------\n";
+                /* while(!worklist.empty()){
+                   errs() << worklist.front()->getName() << "\n";
+                   worklist.pop_front();
+
+                   }
+                 */
+                applyCodeMotion(worklist);
 
                 F.print(errs(), this);
-                return false; //not changing anything
+                return modifed; //not changing anything
             }
 
             virtual void getAnalysisUsage(AnalysisUsage &AU) const {

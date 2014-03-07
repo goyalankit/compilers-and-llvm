@@ -176,6 +176,10 @@ namespace {
 
             virtual bool runOnFunction(Function &F) {
                 domain.clear();
+                bvIndexToInstrArg = new std::vector<Value*>();
+                valueToBitVectorIndex = new ValueMap<Value*, int>();
+                instrInSet = new ValueMap<const Instruction*, BitVector*>();
+ 
                 numArgs = 0;
                 int index = 0;
                 for (Function::arg_iterator arg = F.arg_begin(); arg != F.arg_end(); ++arg){

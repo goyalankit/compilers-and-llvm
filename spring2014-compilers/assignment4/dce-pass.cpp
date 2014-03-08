@@ -18,6 +18,7 @@ Boundary Conditions: empty set for flow value. identified by no successors.
 
  *********************************************************************************/
 
+#define DEBUG_TYPE "dce-pass" 
 
 
 #include "llvm/Pass.h"
@@ -38,6 +39,7 @@ Boundary Conditions: empty set for flow value. identified by no successors.
 #include "llvm/Assembly/Writer.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/ADT/Statistic.h"
 
 
 #include "dataflow.h"
@@ -48,6 +50,8 @@ Boundary Conditions: empty set for flow value. identified by no successors.
 #include <stdlib.h>
 #include <queue>
 #include <set>
+
+STATISTIC(NumElim, "The # of instructions eliminated");
 
 using namespace llvm;
 
@@ -190,6 +194,7 @@ namespace {
                         i.replaceAllUsesWith(UndefValue::get(i.getType())); 
                         i.eraseFromParent();
                         deletedSomething = true;
+                        ++NumElim;
                     }
                     it = next;
                 }
@@ -282,7 +287,7 @@ namespace {
 
                 //Run the liveness analysis to determine the faint variables.
                 DataFlow<BitVector>::runOnFunction(F);
-//                F.print(errs(), this);
+                F.print(errs(), this);
                 return removeTheDead(F);
             }
 

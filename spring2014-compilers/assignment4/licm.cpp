@@ -129,10 +129,19 @@ namespace {
 
             void printBv(const BitVector &bv){
                 errs() << "\n { ";
-                for(int i=0;i<domainSize;i++){
-                    errs() << bv[0] << ", ";
+
+                for(ValueMap<Value*, int>::iterator it = valueToBitVectorIndex->begin(), ie = valueToBitVectorIndex->end(); ie!=it; ++it){
+                    if(it->second < domainSize)
+                        errs() << it->first->getName() << "-" << bv[(it->second)] << ", ";              
                 }
+
                 errs() << " }";
+
+//                errs() << "\n { ";
+                for(int i=0;i<domainSize;i++){
+                   // errs() << bv[i] << ", ";
+                }
+  //              errs() << " }";
             }
 
             /*-----------------------------  Dominator specific methods ---------------------------------------*/
@@ -186,15 +195,21 @@ namespace {
                 if(loop == NULL) return immOut;
 
                 /*============RENAME========================*/
-                BasicBlock *immediateDomBlock;
+                BasicBlock *loopHeader;
 
                 // now we need the dominator
-                immediateDomBlock =  loop->getLoopPreheader(); // (immPreDomMap)[blk];
-                assert(immediateDomBlock != NULL);
+//                loopHeader =  loop->getLoopPreheader(); // (immPreDomMap)[blk];
+                loopHeader =  loop->getHeader(); // (immPreDomMap)[blk];
+
+                assert(loopHeader != NULL);
+
+                errs() << "\nLoop Header: " << loop->getHeader()->getName() << "\n";
+                printBv(*((*in)[loopHeader]));
+                errs() << "Loop PreHeader: " << loop->getLoopPreheader()->getName() << "\n";
 
                 // We want the out of the reaching definitions for the dominator block
-                BitVector definedByDominators =*((*in)[immediateDomBlock]);
-//                printBv(*((*in)[immediateDomBlock]));
+                BitVector rdFromParent =*((*in)[loopHeader]);
+//                BitVector rdFromParent =*((*in)[loop->getHeader()]);
 
                 BasicBlock::InstListType &ls(hotBlock.getInstList());
 
@@ -204,6 +219,7 @@ namespace {
                     User::op_iterator OI, OE;
                     bool instIsInv = true;
 
+
                     if(isa<PHINode>(it) || it->getType()->isVoidTy()) //want to keep these invariant.
                         continue;
 
@@ -211,13 +227,19 @@ namespace {
                     {
 
                         Value *val = *OI;
+
                         if(isa<PHINode>(val)){
-                            instIsInv&=false;
-                            break;
-                        } 
+                            PHINode* phiNode = cast<PHINode>(&*OI);
+                            // if(!((rdFromParent)[(*valueToBitVectorIndex)[phiNode]])){
+                            if(phiNode->getParent() == &hotBlock) {
+                                instIsInv&=false;
+                                errs() << *phiNode << " encountered " << "\n ";
+                                break;
+                            }
+                            } 
 
                         if(isa<Instruction>(val) || isa<Argument>(val)){
-                            if((definedByDominators)[(*valueToBitVectorIndex)[val]] || (*immOut)[(*valueToBitVectorIndex)[val]])     
+                            if((rdFromParent)[(*valueToBitVectorIndex)[val]] || (*immOut)[(*valueToBitVectorIndex)[val]])     
                                 instIsInv&=true;
                             else
                             {
@@ -230,6 +252,7 @@ namespace {
                     }
 
                     if(instIsInv){
+                        //errs() << "We have a candidate " << *it << "\n";
                         (*immOut)[(*valueToBitVectorIndex)[it]] = true;
                     }
                 }
@@ -271,6 +294,7 @@ namespace {
             }
 
             void identifyInvariants(Function &F){
+                errs() <<  "------------" <<"Running for function: " << F.getName() << "\n";
                 Worklist * worklist = new Worklist();
                 initializeWorklist(F, *worklist);
 

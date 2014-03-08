@@ -67,8 +67,9 @@ namespace {
             void performForwardAnalysis(Worklist &w){
                 BasicBlock *hotBlock = *w.begin();
                 w.pop_front();
+                (*visited)[hotBlock] = true;
                 //DEBUG::
-//                errs() << "Entring Block " << hotBlock->getName() << "\n";
+                errs() << "Entring Block " << hotBlock->getName() << "\n";
                 int numPred = 0;
                 for (pred_iterator PI = pred_begin(hotBlock), E = pred_end(hotBlock); PI != E; ++PI){
                     ++numPred;
@@ -81,22 +82,27 @@ namespace {
 
                 if(numPred == 0)  setBoundaryCondition((*in)[hotBlock]);
 
-                FlowValueType *newOut = transferFn(*hotBlock);
 
-                if(*newOut != *(*out)[hotBlock]){
+                FlowValueType *newOut = transferFn(*hotBlock);
+                bool changed = false;
+                changed = (*newOut != *(*out)[hotBlock]);
+
+                if(changed)
                     *(*out)[hotBlock] = *newOut;
+
                     for (succ_iterator SI = succ_begin(hotBlock), E = succ_end(hotBlock); SI != E; ++SI) {
                         //TODO: Don't add to worklist if the block is already present
-                        w.push_back(*SI); 
-                    } 
-                }
+                        if(changed || !(*visited)[*SI]){                            
+                            w.push_back(*SI); 
+                        } 
+                    }
             }
 
             void performBackwardAnalysis(Worklist &w){
                 BasicBlock *hotBlock = *w.begin();
                 w.pop_front();
                 (*visited)[hotBlock] = true;
-//                errs() << "Entring Block " << hotBlock->getName() << "\n";
+                errs() << "Entring Block " << hotBlock->getName() << "\n";
                 //out of this basic block is equivalent to in of it's successor
                 //OUT = Union IN
                 int numSucc = 0; //to check for the exit node

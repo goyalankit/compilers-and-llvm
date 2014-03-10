@@ -191,6 +191,7 @@ namespace {
 
                     if(isDefinition(&i) && (killed)[(*valueToBitVectorIndex)[&i]]){
                         (*instrInSet).erase(&i); //value is being used in the map. Needs to be deleted so that it can be removed
+                        errs() << "Removing instruction: " << i  << "\n";
                         i.replaceAllUsesWith(UndefValue::get(i.getType())); 
                         i.eraseFromParent();
                         deletedSomething = true;

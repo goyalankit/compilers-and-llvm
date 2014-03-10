@@ -380,10 +380,9 @@ int mySimpleCase8(int k){
     }
     return inv;
 }
+#endif
 
-#endif
 #if(0)
-#endif
 int mySimpleCase8(int k){
     int i,j,m, inv, inv2, ran,n;
     for(n=0;;n++){
@@ -407,6 +406,35 @@ int mySimpleCase8(int k){
     }
     return inv;
 }
+#endif
+
+int mySimpleCase8(int k){
+    int i,j,m, inv, inv2, ran,n, r;
+    for(r=0;;r++){
+    for(n=0;;n++){
+           //inv = k + 2;
+        for(m=0;;m++){
+            int l = 23;
+            for(j=0;;j++){
+                for(i=0;;i++){
+                    inv = l * 2323;  //should be hoisted levels =3 
+                    inv2 = inv + k; //shoud be hoisted levels = 3
+                    ran = inv + l; //should be hoisted 2
+                    if(i<k) break;
+                }
+                if(j<k) break;
+            }
+            ran = inv+2;            
+            l = ran + 23;
+            if(m<k) break;
+        }
+        if(n<k) break;
+    }
+    if(r<inv2) break;
+    }
+    return inv;
+}
+
 
 
 

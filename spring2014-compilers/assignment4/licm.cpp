@@ -196,6 +196,7 @@ namespace {
 
                 /*============RENAME========================*/
                 BasicBlock *loopHeader;
+                DominatorTree &DT = getAnalysis<DominatorTree>();
 
                 // now we need the dominator
 //                loopHeader =  loop->getLoopPreheader(); // (immPreDomMap)[blk];
@@ -204,12 +205,12 @@ namespace {
                 assert(loopHeader != NULL);
 
                 errs() << "\nLoop Header: " << loop->getHeader()->getName() << "\n";
-                printBv(*((*in)[loopHeader]));
+                printBv(*((*out)[loop->getLoopPreheader()]));
                 errs() << "Loop PreHeader: " << loop->getLoopPreheader()->getName() << "\n";
 
                 // We want the out of the reaching definitions for the dominator block
-                BitVector rdFromParent =*((*in)[loopHeader]);
-//                BitVector rdFromParent =*((*in)[loop->getHeader()]);
+//                BitVector rdFromParent =*((*in)[loopHeader]);
+                BitVector rdFromParent =*((*out)[loop->getLoopPreheader()]);
 
                 BasicBlock::InstListType &ls(hotBlock.getInstList());
 
@@ -220,23 +221,31 @@ namespace {
                     bool instIsInv = true;
 
 
-                    if(isa<PHINode>(it) || it->getType()->isVoidTy()) //want to keep these invariant.
+                    if(isa<PHINode>(it) || it->getType()->isVoidTy()) //want to keep these inside
                         continue;
 
                     for(OI = it->op_begin(), OE = it->op_end(); OI != OE; ++OI)
                     {
 
                         Value *val = *OI;
-
+                        
                         if(isa<PHINode>(val)){
                             PHINode* phiNode = cast<PHINode>(&*OI);
+                            
+                            errs() << *phiNode << " encountered " << "\n ";
                             // if(!((rdFromParent)[(*valueToBitVectorIndex)[phiNode]])){
-                            if(phiNode->getParent() == &hotBlock) {
+
+                            //check if it is in loop
+                            if((phiNode->getParent() == &hotBlock) || !(rdFromParent)[(*valueToBitVectorIndex)[val]] ){
+
+//                            if(phiNode->getParent() == &hotBlock) {
+                                errs() << *phiNode << " set to false " << "\n ";
                                 instIsInv&=false;
-                                errs() << *phiNode << " encountered " << "\n ";
+                            //    errs() << *phiNode << " encountered " << "\n ";
                                 break;
                             }
-                            } 
+                            
+                        } 
 
                         if(isa<Instruction>(val) || isa<Argument>(val)){
                             if((rdFromParent)[(*valueToBitVectorIndex)[val]] || (*immOut)[(*valueToBitVectorIndex)[val]])     
@@ -261,10 +270,15 @@ namespace {
 
             }
 
-            ValueMap<BasicBlock*, bool> visited;
+//            ValueMap<BasicBlock*, bool> visited;
+
+            ValueMap<BasicBlock*, bool> *identifyVisited;
             void traverseInForward(Worklist &w){
                 BasicBlock *hotBlock = *w.begin();
                 w.pop_front();
+
+                (*identifyVisited)[hotBlock] = true;
+                errs() << "Running for block " << hotBlock->getName() << "\n";
 
                 int numPred = 0;
                 for (pred_iterator PI = pred_begin(hotBlock), E = pred_end(hotBlock); PI != E; ++PI){
@@ -286,8 +300,8 @@ namespace {
                 if(changed)
                     *(*ivOut)[hotBlock] = *newOut;
 
-                for (succ_iterator SI = succ_begin(hotBlock), E = succ_end(hotBlock); SI != E; ++SI) {
-                    if(changed) {
+                for (succ_iterator SI = succ_begin(hotBlock), E = succ_end(hotBlock); SI != E; ++SI) {                  
+                    if(changed || (*identifyVisited)[*SI] == false) {
                         w.push_back(*SI); 
                     } 
                 }
@@ -300,6 +314,7 @@ namespace {
 
                 ivIn = new IvBlockInOutMap();
                 ivOut = new IvBlockInOutMap();
+                identifyVisited = new ValueMap<BasicBlock*, bool>();
 
                 for (Function::iterator bi = F.begin(), be = F.end(); bi != be; bi++) {
                     BasicBlock * bb = &*bi;
@@ -396,6 +411,8 @@ namespace {
                         
                         for(Value::use_iterator ui = ii->use_begin(), ue = ii->use_end(); ui!=ue; ++ui){
                             Instruction *vi = dyn_cast<Instruction>(*ui);
+                            if(ii->getName() == "cmp6")
+                                errs() << "USAGE: " << *vi << "  " << DT.dominates(ii,vi) << "\n";
                             if(!DT.dominates(ii,vi)) {
                                 canMove &= false;
                             }
@@ -404,9 +421,10 @@ namespace {
                         //Move the instruction
                         if(canMove){
                             Instruction *ti = loop->getLoopPreheader()->getTerminator();
+                            
                             ++it;
                             ii->moveBefore(ti);
-                            worklist.push_back(loop->getLoopPreheader());
+                            worklist.push_front(loop->getLoopPreheader());
                             errs() << "hoisting " << *ii << " to " << loop->getLoopPreheader()->getName() << "\n";
                             modifed = true;
                             ++NumHoisted;

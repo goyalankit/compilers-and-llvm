@@ -362,9 +362,61 @@ namespace {
                 dfs(F.getEntryBlock(), worklist, visited);
             }
 
-            ValueMap<Instruction*, Instruction*> to_be_moved;
 
+            bool checkIfStillInvariant(BasicBlock *hotBlock, Instruction *ii){
+
+                BitVector immOut = *(*ivOut)[hotBlock];
+                LoopInfo &LI = getAnalysis<LoopInfo>();
+                BasicBlock *blk(hotBlock);
+
+                Loop *loop   = LI.getLoopFor(blk);
+                bool instIsInv = true;
+   
+                User::op_iterator OI, OE;
+
+                BitVector rdFromParent =*((*out)[loop->getLoopPreheader()]);
+                for(OI = ii->op_begin(), OE = ii->op_end(); OI != OE; ++OI) {
+
+                    Value *val = *OI;
+
+                    if(isa<PHINode>(val)){
+                        PHINode* phiNode = cast<PHINode>(&*OI);
+
+                        errs() << *phiNode << " encountered " << "\n ";
+                        // if(!((rdFromParent)[(*valueToBitVectorIndex)[phiNode]])){
+
+                        //check if it is in loop
+                        if((phiNode->getParent() == hotBlock) || !(rdFromParent)[(*valueToBitVectorIndex)[val]] ){
+
+                            //                            if(phiNode->getParent() == &hotBlock) {
+                            errs() << *phiNode << " set to false " << "\n ";
+                            instIsInv&=false;
+                            //    errs() << *phiNode << " encountered " << "\n ";
+                            break;
+                        }
+
+                        } 
+
+                        if(isa<Instruction>(val) || isa<Argument>(val)){
+
+                            if((rdFromParent)[(*valueToBitVectorIndex)[val]] || (immOut)[(*valueToBitVectorIndex)[val]])     
+                                instIsInv&=true;
+                            else
+                            {
+                                instIsInv&=false;
+                                break;
+                            }
+                        }else if(isa<Constant>(val)){
+                            instIsInv&=true;
+                        }
+                    }
+                        return instIsInv;
+                    }
+
+
+            ValueMap<Instruction*, Instruction*> to_be_moved;
             virtual void applyCodeMotion(Worklist &worklist){
+                ValueMap<Instruction*, bool> alreadyHoisted;
                 while(!worklist.empty()){
 
                     BasicBlock* CB = worklist.front();
@@ -421,9 +473,16 @@ namespace {
                         //Move the instruction
                         if(canMove){
                             Instruction *ti = loop->getLoopPreheader()->getTerminator();
-                            
                             ++it;
+                            if(alreadyHoisted[ii] == true){
+                                if(checkIfStillInvariant(CB, ii) == false){
+                                    continue;
+                                }                               
+                            }
+                                
                             ii->moveBefore(ti);
+
+                            alreadyHoisted[ii] = true;
                             worklist.push_front(loop->getLoopPreheader());
                             errs() << "hoisting " << *ii << " to " << loop->getLoopPreheader()->getName() << "\n";
                             modifed = true;
@@ -432,8 +491,6 @@ namespace {
                             ++it;
                         }
                     }
-
-
                 }                  
             }
 

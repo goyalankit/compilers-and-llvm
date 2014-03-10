@@ -77,6 +77,7 @@ int loop3(int a, int b, int c)
 /*
  Following loop has same invariant instruction inside nested loops.
  Both the instructions should be lifted and inv = b + 7 should be before inv = b + 3
+ count  = 3
  */
 
 int myloop1(int k){
@@ -103,6 +104,7 @@ l1:
 }
 
 
+//count = 3
 int myloop2(int k){
 
     if(k<12)
@@ -129,6 +131,8 @@ l1:
     return 0;
 }
 
+#if(0)
+#endif
 
 //since l1 doesn't domintate l2. instructions should not be hoisted above l2
 int myloop4(int k){
@@ -157,9 +161,13 @@ l2:    {
        inv = b + 3;
        if(k<1000) break;
     }
-    return 0;
+    return k;
 }
 
+void main(){
+    int a = myloop4(3);
+
+}
 
 //inv should be hoisted
 int l = 2434;
@@ -171,6 +179,7 @@ int myloop6(){
         if(i<8) break;
     }
 }
+
 
 
 
@@ -189,7 +198,6 @@ int loop7(int a, int b, int c)
     return c;
 }
 
-
 int loop9(int a, int b, int c)
 {
     int inv;
@@ -204,14 +212,13 @@ int loop9(int a, int b, int c)
 
     return inv;
 }
-
+#if(0)
 #endif
 
 ///////////////////////////////////////////
 ///// TEST CASE SET = 2 || RUN THEM SEPARATLEY
 /////////////////////////////////////////
 
-#if(0)
 
 int mySimpleCase(int k){
     int i,j, inv;
@@ -278,7 +285,7 @@ int mySimpleCase5(int k){
             inv2 = inv + k; //shoud be hoisted levels = 1
             if(i<k) break;
         }
-        ran = inv + k; //should not be hoisted
+        ran = inv + k; //should not be hoisted. because inv depends on k which is being updated in next instruction
         k = inv2 + 24;
         if(j<k) break;
     }
@@ -286,7 +293,6 @@ int mySimpleCase5(int k){
 }
 
 //hoisting count = 13
-#endif
 
 int mySimpleCase6(int k){
     int i,j, inv, inv2, ran;
@@ -305,7 +311,7 @@ int mySimpleCase6(int k){
 }
 
 
-//All instructions should be hoisted.
+//All instructions should be hoisted. count = 6
 int mySimpleCase7(int k){
     int i,j, inv, inv2, ran;
     for(j=0;;j++){
@@ -321,11 +327,94 @@ int mySimpleCase7(int k){
     }
     return inv;
 }
+#if(0)
+#endif
 
-void main(){
-    int s = mySimpleCase7(3);
-    int k = mySimpleCase6(4);
 
-    printf("%d, %d", s, k);
+#if(0)
+int mySimpleCase8(int k){
+    int i,j,m, inv, inv2, ran;
+    for(m=0;;m++){
+        for(j=0;;j++){
+            int l = 23;
+            for(i=0;;i++){
+                inv = l * 2323;  //should be hoisted levels =3 
+                inv2 = inv + k; //shoud be hoisted levels = 3
+                if(i<k) break;
+            }
+            ran = inv + l; //should be hoisted 2
+            l = inv2 + 24; //should be hoisted 2
+            if(j<k) break;
+        }
+        ran = inv+2;
+        if(m<k) break;
+    }
+    return inv;
 }
 
+#endif
+#endif
+#if(0)
+
+int mySimpleCase8(int k){
+    int i,j,m, inv, inv2, ran,n;
+    for(n=0;;n++){
+
+        for(m=0;;m++){
+            j = inv;
+            for(j=0;;j++){
+                int l = 23;
+                for(i=0;;i++){
+                    inv = l * 2323;  //should be hoisted levels =2
+                    inv2 = inv + k; //shoud be hoisted levels = 2
+                    if(i<k) break;
+                }
+                ran = inv + l; //should be hoisted 1
+                l = inv2 + 24; //should be hoisted 1
+                if(j<k) break;
+            }
+            ran = inv+2;
+            if(m<k) break;
+        }
+        if(n<k) break;
+    }
+    return inv;
+}
+
+#endif
+#if(0)
+#endif
+int mySimpleCase8(int k){
+    int i,j,m, inv, inv2, ran,n;
+    for(n=0;;n++){
+
+        for(m=0;;m++){
+            int l = 23;
+            inv = l * 2323;  //should be hoisted levels =3 
+            inv2 = inv + k; //shoud be hoisted levels = 3
+            ran = inv + l; //should be hoisted 2
+            l = inv2 + 24; //should be hoisted 2
+            for(j=0;;j++){
+                for(i=0;;i++){
+                    if(i<k) break;
+                }
+                if(j<k) break;
+            }
+            ran = inv+2;
+            if(m<k) break;
+        }
+        if(n<k) break;
+    }
+    return inv;
+}
+
+
+
+/*
+   void main(){
+   int s = mySimpleCase7(3);
+   int k = mySimpleCase6(4);
+
+   printf("%d, %d", s, k);
+   }
+ */

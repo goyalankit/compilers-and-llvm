@@ -205,7 +205,7 @@ namespace {
                 assert(loopHeader != NULL);
 
                 errs() << "\nLoop Header: " << loop->getHeader()->getName() << "\n";
-                printBv(*((*out)[loop->getLoopPreheader()]));
+                //printBv(*((*out)[loop->getLoopPreheader()]));
                 errs() << "Loop PreHeader: " << loop->getLoopPreheader()->getName() << "\n";
 
                 // We want the out of the reaching definitions for the dominator block
@@ -233,10 +233,13 @@ namespace {
                             PHINode* phiNode = cast<PHINode>(&*OI);
 
                             errs() << *phiNode << " encountered " << "\n ";
+
+
+                            Loop *loop2  = LI.getLoopFor(phiNode->getParent());
                             // if(!((rdFromParent)[(*valueToBitVectorIndex)[phiNode]])){
 
                             //check if it is in loop
-                            if((phiNode->getParent() == &hotBlock) || !(rdFromParent)[(*valueToBitVectorIndex)[val]] ){
+                            if((phiNode->getParent() == &hotBlock) || (loop2 != NULL && loop2 == loop)  || !(rdFromParent)[(*valueToBitVectorIndex)[val]] ){
 
                                 //                            if(phiNode->getParent() == &hotBlock) {
                                 errs() << *phiNode << " set to false " << "\n ";
@@ -245,9 +248,12 @@ namespace {
                                 break;
                             }
 
+                            //if()
+                              //  (*immOut)[(*valueToBitVectorIndex)[val]]
                             } 
 
                             if(isa<Instruction>(val) || isa<Argument>(val)){
+
                                 if((rdFromParent)[(*valueToBitVectorIndex)[val]] || (*immOut)[(*valueToBitVectorIndex)[val]])     
                                     instIsInv&=true;
                                 else
@@ -261,7 +267,7 @@ namespace {
                         }
 
                         if(instIsInv){
-                            //errs() << "We have a candidate " << *it << "\n";
+                            errs() << "We have a candidate " << *it << "\n";
                             (*immOut)[(*valueToBitVectorIndex)[it]] = true;
                         }
                         }
@@ -368,18 +374,24 @@ namespace {
                         BitVector immOut = *(*ivOut)[hotBlock];
                         LoopInfo &LI = getAnalysis<LoopInfo>();
                         BasicBlock *blk(hotBlock);
-
+                        errs() << "Checking for " << *ii << "\n";
                         Loop *loop   = LI.getLoopFor(blk);
                         bool instIsInv = true;
 
                         User::op_iterator OI, OE;
 
-                        BitVector rdFromParent =*((*out)[loop->getLoopPreheader()]);
+                        DominatorTree &DT = getAnalysis<DominatorTree>();
+                        BitVector rdFromParent =*((*in)[loop->getHeader()]);
+
+
                         for(OI = ii->op_begin(), OE = ii->op_end(); OI != OE; ++OI) {
 
                             Value *val = *OI;
 
                             if(isa<PHINode>(val)){
+
+
+
                                 PHINode* phiNode = cast<PHINode>(&*OI);
 
                                 errs() << *phiNode << " encountered " << "\n ";
@@ -398,6 +410,13 @@ namespace {
                                 } 
 
                                 if(isa<Instruction>(val) || isa<Argument>(val)){
+                                   
+                                    Instruction *instVal = dyn_cast<Instruction>(OI);
+                                    if(isa<Instruction>(val)){
+                                        Loop *loop3  = LI.getLoopFor(instVal->getParent());                               
+                                        if((loop3 != NULL) && (loop3 == loop || DT.dominates(loop->getHeader(), loop3->getHeader())))
+                                            instIsInv&= false;
+                                    }
 
                                     if((rdFromParent)[(*valueToBitVectorIndex)[val]] || (immOut)[(*valueToBitVectorIndex)[val]])     
                                         instIsInv&=true;
@@ -438,6 +457,8 @@ namespace {
                                     DominatorTree &DT = getAnalysis<DominatorTree>();
                                     for(BasicBlock::InstListType::iterator it(ls.begin()), e(ls.end()); it != e ; )
                                     {
+                                        
+
                                         bool canMove = false;
                                         if(it->getType()->isVoidTy()) {
                                             ++it;
@@ -445,6 +466,7 @@ namespace {
                                         }                                               
 
                                         Instruction *ii = &*it;
+
 
                                         if(ivCurrent[(*valueToBitVectorIndex)[it]]){ //check that the instruction is invariant
                                             canMove = true;
@@ -461,24 +483,30 @@ namespace {
 
                                         //todo check the instruciton dominate all uses.
 
+
                                         for(Value::use_iterator ui = ii->use_begin(), ue = ii->use_end(); ui!=ue; ++ui){
                                             Instruction *vi = dyn_cast<Instruction>(*ui);
-                                            if(ii->getName() == "cmp6")
-                                                errs() << "USAGE: " << *vi << "  " << DT.dominates(ii,vi) << "\n";
-                                            if(!DT.dominates(ii,vi)) {
+                                            //errs() << "USAGE: " << *vi << "  " << DT.dominates(ii,vi) << "\n";
+
+                                            Loop *loop2   = LI.getLoopFor(vi->getParent());
+                                            if(loop2 == loop && !DT.dominates(ii,vi)) {
                                                 canMove &= false;
                                             }
                                         }  
+
+                                        if(ii->getName() == "mul")
+                                            errs() << "CANE MOVE " << canMove << "\n";
 
                                         //Move the instruction
                                         if(canMove){
                                             Instruction *ti = loop->getLoopPreheader()->getTerminator();
                                             ++it;
-                                            if(alreadyHoisted[ii] == true){
+//                                            if(alreadyHoisted[ii] == true){
                                                 if(checkIfStillInvariant(CB, ii) == false){
-                                                    continue;
+                                                   continue;
                                                 }                               
-                                            }
+   //                                             errs() << "Rehoisting " << *ii << "\n";
+  //                                          }
 
                                             ii->moveBefore(ti);
 

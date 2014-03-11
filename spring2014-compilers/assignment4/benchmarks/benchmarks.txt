@@ -1,0 +1,93 @@
+Source code used for benchmarking is included in the benchmarks folder.
+
+### Loop Invariant benchmarks
+---
+
+1. Matrix-matrix multiplication.(900 * 900) [ li_test_1.cpp ]
+invariant instruction of the form  `inv = p1 * p2 * p1;` present inside the loop.
+
+Execution Results:
+
+After running licm pass:
+./lli sum-out.bc
+Time taken: 0.950000
+Result: 17031238350.0
+
+---
+
+Without running licm pass:
+./lli sum-simp.bc
+Time taken: 1.240000
+Result: 17031238350.0
+
+---
+
+After running LLVM provided licm pass:
+Using: opt -stats -debug -licm sum-simp.c -o sum-ll.bc
+
+./lli sum-ll.bc
+Time taken: 1.200000
+Result: 17031238350.0
+
+---
+
+Compiled with gcc
+Using: gcc li_test_1.cpp
+
+./a.out
+Time taken: 3.250000 //I Don't know why this is so bad!
+Result: 17031238350.0
+
+---
+Compiled with intel icc compiler
+Using: icc li_test_1.cpp
+
+./a.out
+Time taken: 0.370000
+17031238350.0
+
+
+
+Note that the result is same in both the cases which varifies the correctness.
+Improvement by 23% in execution time from unoptimized version
+
+My pass produced a better version than llvm's pass. LLVM was able to move load and store instructions for heap
+related to array indexing. I think my program had less cache misses.
+
+
+2. General Nested For Loops. [ li_test_2.cpp ]
+
+After running my licm pass:
+lli sum-out.bc
+Time taken: 13.300000
+
+Without licm pass:
+lli sum-simp.bc
+Time taken: 13.500000
+
+After running LLVM licm pass:
+Time taken: 13.280000
+
+
+This is a generic nested loop program where the nested loops contain some computation.
+After running licm computation is moved outside the loop.
+LLVM's licm pass is folding the instructions and removing them altogether hence it is faster.
+
+
+### Dead Code Elimination
+---
+
+1. Test Program (dce_test1.cpp)
+
+Without running dce pass:
+Time taken: 0.970000
+
+After running my dce pass:
+Time taken: 0.770000
+
+After running llvm's dce pass:
+Time taken: 0.920000
+
+2. 
+
+
